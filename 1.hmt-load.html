@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMT Library Test - hmtcurrent</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        #output { border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; }
+        pre { background-color: #eee; padding: 10px; border-radius: 4px; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+    <!-- 1. Include cex-lib.js (from jsDelivr or local path) -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include your hmt-lib.js (ensure this path is correct) -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>HMT Library Test: <code>HMTLib.hmtcurrent()</code></h1>
+    <div id="output">Loading HMT CEX data... Please wait.</div>
+
+    <script>
+        async function runTest() {
+            const outputDiv = document.getElementById('output');
+
+            if (typeof HMTLib === 'undefined' || typeof HMTLib.hmtcurrent === 'undefined') {
+                outputDiv.innerHTML = `<p style="color:red;"><strong>Error:</strong> HMTLib or HMTLib.hmtcurrent is not defined. Ensure hmt-lib.js is loaded correctly after cex-lib.js.</p>`;
+                return;
+            }
+
+            try {
+                // Call hmtcurrent, which returns a Promise<CEXParser>
+                // The resolved value of the promise is the CEXParser instance itself,
+                // after loadFromUrl has successfully processed the CEX data.
+                const parserInstance = await HMTLib.hmtcurrent();
+
+                
+                const allBlockLabels = parserInstance.getUniqueBlockLabels(); // Correct method from CEXParser API
+                outputDiv.innerHTML = `
+                    <p style="color:green;"><strong>HMT CEX data loaded successfully!</strong></p>
+                    <p>The <code>HMTLib.hmtcurrent()</code> function returned a <code>CEXParser</code> instance.</p>
+                    <h3>Parser Instance Details:</h3>
+                    <ul>
+                        <li>Is instance of CEXParser: <code>${parserInstance instanceof CEXParser}</code></li>
+                        <li>Number of unique block labels found: <code>${allBlockLabels.length}</code></li>
+                        <li>Block labels: <code>${allBlockLabels.join(', ')}</code></li>
+                    </ul>
+                    <p>This 'parserInstance' (logged to console) can now be used to extract data using CEXParser methods.</p>
+                `;
+
+                console.log("CEXParser instance returned by HMTLib.hmtcurrent():", parserInstance);
+
+            
+
+            } catch (error) {
+                outputDiv.innerHTML = `<p style="color:red;"><strong>Error loading or processing HMT CEX data:</strong> ${error.message}</p>`;
+                console.error("Error in runTest:", error);
+            }
+        }
+
+        runTest();
+    </script>
+</body>
+</html>
