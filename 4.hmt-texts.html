@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMT Library Test - Normalized & Diplomatic Filters</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        #results { border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; margin-top: 20px; }
+        .status { font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+    </style>
+    <!-- 1. Include cex-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include urn-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <!-- 3. Include your hmt-lib.js (ensure this path is correct) -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>HMT Library Test: <code>hmtnormalized</code> and <code>hmtdiplomatic</code></h1>
+    <div id="loadingStatus">
+        <p class="status">Loading HMT CEX data and applying filters... Please wait.</p>
+    </div>
+    <div id="results" style="display:none;">
+        <h2>Filter Results:</h2>
+        <p>Number of <strong>normalized</strong> text passages: <strong id="normalizedCount">N/A</strong></p>
+        <p>Number of <strong>diplomatic</strong> text passages: <strong id="diplomaticCount">N/A</strong></p>
+    </div>
+    <div id="errorLog" style="display:none;" class="error"></div>
+
+    <script>
+        async function runFilterTest() {
+            const loadingStatusDiv = document.getElementById('loadingStatus');
+            const resultsDiv = document.getElementById('results');
+            const errorLogDiv = document.getElementById('errorLog');
+            const normalizedCountSpan = document.getElementById('normalizedCount');
+            const diplomaticCountSpan = document.getElementById('diplomaticCount');
+
+            function showError(message) {
+                errorLogDiv.innerHTML += `<p>${message}</p>`;
+                errorLogDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status error">An error occurred.</p>`;
+            }
+
+            if (typeof CEXParser === 'undefined') {
+                showError("<strong>Error:</strong> CEXParser is not defined. Ensure cex-lib.js is loaded.");
+                return;
+            }
+            if (typeof URNTools === 'undefined') {
+                showError("<strong>Error:</strong> URNTools is not defined. Ensure urn-lib.js is loaded.");
+                return;
+            }
+            if (typeof HMTLib === 'undefined' ||
+                typeof HMTLib.hmtcurrent === 'undefined' ||
+                typeof HMTLib.hmtnormalized === 'undefined' ||
+                typeof HMTLib.hmtdiplomatic === 'undefined') {
+                showError("<strong>Error:</strong> HMTLib or its required functions are not defined. Ensure hmt-lib.js is loaded correctly.");
+                return;
+            }
+
+            try {
+                const parserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = `<p class="status success">HMT CEX data loaded successfully. Applying filters...</p>`;
+
+                const normalizedRecords = HMTLib.hmtnormalized(parserInstance);
+                const diplomaticRecords = HMTLib.hmtdiplomatic(parserInstance);
+
+                normalizedCountSpan.textContent = normalizedRecords.length;
+                diplomaticCountSpan.textContent = diplomaticRecords.length;
+
+                resultsDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status success">Processing complete.</p>`;
+
+                console.log("Normalized records found:", normalizedRecords.length, normalizedRecords.slice(0, 5)); // Log first 5 for quick check
+                console.log("Diplomatic records found:", diplomaticRecords.length, diplomaticRecords.slice(0, 5)); // Log first 5 for quick check
+
+            } catch (error) {
+                showError(`<strong>Error during processing:</strong> ${error.message}`);
+                console.error("Error in runFilterTest:", error);
+            }
+        }
+
+        runFilterTest();
+    </script>
+</body>
+</html>
