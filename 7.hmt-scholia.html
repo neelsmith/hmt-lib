@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMT Library Test - Scholia Functions</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        .results-section { border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; margin-top: 20px; }
+        .status { font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+        pre { background-color: #eef; padding: 10px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto; }
+        h2, h3 { margin-top: 1em; }
+    </style>
+    <!-- 1. Include cex-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include urn-lib.js (HMTLib uses it for other functions) -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <!-- 3. Include your hmt-lib.js (ensure this path is correct) -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>HMT Library Test: Scholion Functions</h1>
+    <div id="loadingStatus">
+        <p class="status">Loading HMT CEX data and scholia records... Please wait.</p>
+    </div>
+
+    <div id="testResults" style="display:none;">
+        <div class="results-section">
+            <h3>Test <code>hmtscholia</code></h3>
+            <p>Total number of Scholion objects: <strong id="totalScholiaCount">N/A</strong></p>
+        </div>
+
+        <div class="results-section">
+            <h3>Test <code>passageforscholion</code></h3>
+            <p>Searching for Iliad passage for scholion: <code>urn:cts:greekLit:tlg5026.msAint.hmt:1.27</code></p>
+            <p>Iliad passage URN found:</p>
+            <pre id="passageForScholionOutput">N/A</pre>
+        </div>
+
+        <div class="results-section">
+            <h3>Test <code>scholiaforpassage</code></h3>
+            <p>Searching for scholia for Iliad passage: <code>urn:cts:greekLit:tlg0012.tlg001.msA:1.1</code></p>
+            <p>Scholia URNs found (<span id="scholiaForPassageCount">0</span>):</p>
+            <pre id="scholiaForPassageOutput">N/A</pre>
+        </div>
+    </div>
+
+    <div id="errorLog" style="display:none;" class="error"></div>
+
+    <script>
+        async function runScholiaTest() {
+            const loadingStatusDiv = document.getElementById('loadingStatus');
+            const testResultsDiv = document.getElementById('testResults');
+            const errorLogDiv = document.getElementById('errorLog');
+
+            const totalScholiaCountEl = document.getElementById('totalScholiaCount');
+            const passageForScholionOutputEl = document.getElementById('passageForScholionOutput');
+            const scholiaForPassageCountEl = document.getElementById('scholiaForPassageCount');
+            const scholiaForPassageOutputEl = document.getElementById('scholiaForPassageOutput');
+
+            function showError(message, errorObj = null) {
+                errorLogDiv.innerHTML += `<p>${message}</p>`;
+                errorLogDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status error">An error occurred. Check console for details.</p>`;
+                console.error(message, errorObj || '');
+            }
+
+            function escapeHtml(unsafe) {
+                if (unsafe === null || typeof unsafe === 'undefined') return 'null';
+                return unsafe
+                    .toString()
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            if (typeof CEXParser === 'undefined' || typeof URNTools === 'undefined' || typeof HMTLib === 'undefined' ||
+                !HMTLib.hmtcurrent || !HMTLib.Scholion || !HMTLib.hmtscholia ||
+                !HMTLib.passageforscholion || !HMTLib.scholiaforpassage) {
+                showError("<strong>Error:</strong> A required library (CEXParser, URNTools, HMTLib) or HMTLib scholia function is not defined. Ensure all scripts are loaded correctly.");
+                return;
+            }
+
+            try {
+                const parserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = `<p class="status success">HMT CEX data loaded. Processing scholia records...</p>`;
+                
+                const allScholiaRecords = HMTLib.hmtscholia(parserInstance);
+                console.log(`Total Scholion Records fetched by hmtscholia: ${allScholiaRecords.length}`);
+
+                if (allScholiaRecords.length === 0) {
+                     console.warn("Warning: No Scholion records were found by `hmtscholia`. Check target URN and CEX file structure if this is unexpected.");
+                }
+                totalScholiaCountEl.textContent = allScholiaRecords.length;
+                loadingStatusDiv.innerHTML = `<p class="status success">Scholia records processed (${allScholiaRecords.length} found). Running query tests...</p>`;
+
+                // Test passageforscholion
+                const scholionUrnToTest = "urn:cts:greekLit:tlg5026.msAint.hmt:1.27";
+                const foundIliadPassage = HMTLib.passageforscholion(scholionUrnToTest, allScholiaRecords);
+                passageForScholionOutputEl.textContent = escapeHtml(foundIliadPassage) || "Iliad passage not found (result is null).";
+                console.log(`Test passageforscholion with scholion URN ${scholionUrnToTest}: Result is '${foundIliadPassage}'`);
+
+                // Test scholiaforpassage
+                const iliadPassageToTest = "urn:cts:greekLit:tlg0012.tlg001.msA:1.1";
+                const foundScholiaUrns = HMTLib.scholiaforpassage(iliadPassageToTest, allScholiaRecords);
+                scholiaForPassageCountEl.textContent = foundScholiaUrns.length;
+                if (foundScholiaUrns.length > 0) {
+                    scholiaForPassageOutputEl.textContent = foundScholiaUrns.map(escapeHtml).join('\n');
+                } else {
+                    scholiaForPassageOutputEl.textContent = "No scholia URNs found for this Iliad passage.";
+                }
+                console.log(`Test scholiaforpassage with Iliad passage URN ${iliadPassageToTest}: Found ${foundScholiaUrns.length} scholia.`, foundScholiaUrns);
+
+                testResultsDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status success">All scholia query tests complete.</p>`;
+
+            } catch (error) {
+                showError(`<strong>Error during main test execution:</strong> ${error.message}`, error);
+            }
+        }
+
+        runScholiaTest();
+    </script>
+</body>
+</html>
