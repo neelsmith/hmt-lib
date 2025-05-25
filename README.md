@@ -30,12 +30,15 @@ In addition to the library itself (`hmt-lib.js`) and the documentation (`apis.md
 
 
 
+## Caveats and technical information
 
-## Applications
+I built this library, but I don't (and won't) write javascript, so I gave in completely to what Anrej Karpathy has called [vibe coding](https://x.com/karpathy/status/1886192184808149383?lang=en). The javascript, the markdown documentation (including the quoted summary at the top of this page), and the HTML apps were all written by gemini-2.5-pro. I've made sure that the library passes a handful of sanity tests, but I have not looked at the code at all. When I ran into errors, I let gemini fix them. Use the code as you like, but be aware that I have no idea what it does or how it works.
 
-HTML files illustrating usage of the library:
+### How I build it
 
-- `1.hmt-load.html`: illustrates how to load the current release of the Homer Multitext project into a parsed object.
+If you're curious about how I built the library, the file `chat.txt` has a complete transcript of the conversation I had with gemini-2.5-pro. The `stages` directory has the functioning intermediate versions of the library. The numbers in the filenames correspond to the sequence of the library in the conversation, culminating in `hmt-lib-15.js`, which is the final version of the library, and identical to `hmt-lib.js` in this repository. 
 
 
+## License
 
+This repository is licensed under the [GPL-3.0](https://www.gnu.org/licenses/gpl-3.0.en.html) license. You can use the code in this repository for any purpose, but you must include a copy of the GPL-3.0 license in any distribution of the code or derivative works. See the [LICENSE](./LICENSE) file for more details.
