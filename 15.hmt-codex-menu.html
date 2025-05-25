@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add a menu of HMT manuscripts to a web page</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        .status { font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+        #menuContainer, #selectionDisplay { margin-top: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f9f9f9; }
+        select { padding: 5px; font-size: 1em; margin-bottom: 10px; }
+    </style>
+    <!-- 1. Include cex-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include urn-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <!-- 3. Include your hmt-lib.js -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>How to add a menu of HMT manuscripts to a web page</h1>
+    <p>This page demonstrates how to load the HMT CEX data and a menu of HMT manuscripts to a web page using the <code>codexmenu</code> function.</p>
+        
+    
+    <div id="loadingStatus">
+        <p class="status">Loading HMT CEX data... Please wait.</p>
+    </div>
+
+    <div id="menuContainer" style="display:none;">
+        <h3>Select a Codex:</h3>
+        <!-- Menu will be injected here -->
+    </div>
+
+    <div id="selectionDisplay" style="display:none;">
+        <p>Current Selection: <strong id="currentSelectionText">N/A</strong></p>
+    </div>
+
+    <div id="errorLog" style="display:none;" class="error"></div>
+
+    <script>
+        async function runCodexMenuTest() {
+            const loadingStatusDiv = document.getElementById('loadingStatus');
+            const menuContainerDiv = document.getElementById('menuContainer');
+            const selectionDisplayDiv = document.getElementById('selectionDisplay');
+            const currentSelectionTextEl = document.getElementById('currentSelectionText');
+            const errorLogDiv = document.getElementById('errorLog');
+
+            function showError(message, errorObj = null) {
+                errorLogDiv.innerHTML += `<p>${message}</p>`;
+                errorLogDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status error">An error occurred. Check console.</p>`;
+                console.error(message, errorObj || '');
+            }
+
+            // Check for all necessary HMTLib functions for this test
+            if (typeof CEXParser === 'undefined' || typeof URNTools === 'undefined' || typeof HMTLib === 'undefined' ||
+                !HMTLib.hmtcurrent || !HMTLib.codexmenu || !HMTLib.codexlist || !HMTLib.collectionlabel) {
+                showError("<strong>Error:</strong> A required library or HMTLib function (hmtcurrent, codexmenu, codexlist, collectionlabel) is not defined. Ensure all scripts are loaded correctly.");
+                return;
+            }
+
+            try {
+                const parserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = `<p class="status success">HMT CEX data loaded. Generating codex menu...</p>`;
+                
+                const menuId = "codexSelector";
+                const menuName = "codex_choice";
+                const menuHtml = HMTLib.codexmenu(parserInstance, menuName, menuId);
+
+                // It's safer to set innerHTML of a dedicated container for the menu
+                const menuTargetDiv = document.createElement('div');
+                menuTargetDiv.innerHTML = menuHtml;
+                menuContainerDiv.appendChild(menuTargetDiv); // Append the div containing the select
+
+                menuContainerDiv.style.display = 'block';
+                selectionDisplayDiv.style.display = 'block';
+
+                const selectElement = document.getElementById(menuId);
+                if (selectElement) {
+                    // Initial display of selection
+                    if (selectElement.options.length > 0 && selectElement.value) {
+                         currentSelectionTextEl.textContent = selectElement.value;
+                    } else if (selectElement.options.length > 0 && selectElement.options[0].value === "") {
+                        currentSelectionTextEl.textContent = selectElement.options[0].textContent; // e.g., "No codices found"
+                    } else {
+                         currentSelectionTextEl.textContent = "Menu may be empty or an error occurred.";
+                    }
+
+                    // Add event listener for changes
+                    selectElement.addEventListener('change', function() {
+                        currentSelectionTextEl.textContent = this.value;
+                    });
+                } else {
+                    showError("Could not find the generated select element by ID: " + menuId);
+                }
+
+                loadingStatusDiv.innerHTML = `<p class="status success">Codex menu generated and displayed.</p>`;
+                console.log("Generated menu HTML by codexmenu:", menuHtml);
+                console.log("Codex URNs from codexlist for menu:", HMTLib.codexlist(parserInstance));
+
+
+            } catch (error) {
+                showError(`<strong>Error during main test execution:</strong> ${error.message}`, error);
+            }
+        }
+
+        runCodexMenuTest();
+    </script>
+</body>
+</html>

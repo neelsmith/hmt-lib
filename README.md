@@ -26,7 +26,7 @@ In addition to the library itself (`hmt-lib.js`) and the documentation (`apis.md
 - `8.hmt-codex.html`: illustrates how load a list of `CodexPage` objects for a given manuscript.
 - `9.hmt-catalogs.html`: illustrates how to find human-readable labels for objects cited by CITE2 URN or CTS URN.
 - `14.hmt-codex.html`: illustrates how to use the `codexlist` function to find URNs of all documented codices.
-
+- `15.hmt-codex-menu.html`: illustrates how to add a menu of HMT manuscripts to a web page using the `codexmenu` function.
 
 
 
