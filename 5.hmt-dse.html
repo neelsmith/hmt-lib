@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMT Library Test - DSE Records</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        #results { border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; margin-top: 20px; }
+        .status { font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+        .record { border-bottom: 1px solid #eee; padding: 8px 0; margin-bottom: 8px; }
+        .record:last-child { border-bottom: none; margin-bottom: 0; }
+        .record strong { display: inline-block; min-width: 80px; }
+        pre { background-color: #eef; padding: 5px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+    <!-- 1. Include cex-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include urn-lib.js (optional for this specific test, but good for consistency) -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <!-- 3. Include your hmt-lib.js (ensure this path is correct) -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>HMT Library Test: <code>hmtdse</code> Function</h1>
+    <div id="loadingStatus">
+        <p class="status">Loading HMT CEX data and processing DSE records... Please wait.</p>
+    </div>
+    <div id="results" style="display:none;">
+        <h2>DSE Record Results:</h2>
+        <p>Total number of DSERecord objects: <strong id="totalCount">N/A</strong></p>
+        <h3>First 10 DSERecord Objects (if available):</h3>
+        <div id="dseList">
+            <p><em>No records to display.</em></p>
+        </div>
+    </div>
+    <div id="errorLog" style="display:none;" class="error"></div>
+
+    <script>
+        async function runDseTest() {
+            const loadingStatusDiv = document.getElementById('loadingStatus');
+            const resultsDiv = document.getElementById('results');
+            const errorLogDiv = document.getElementById('errorLog');
+            const totalCountSpan = document.getElementById('totalCount');
+            const dseListDiv = document.getElementById('dseList');
+
+            function showError(message) {
+                errorLogDiv.innerHTML += `<p>${message}</p>`;
+                errorLogDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status error">An error occurred.</p>`;
+            }
+
+            function escapeHtml(unsafe) {
+                if (unsafe === null || typeof unsafe === 'undefined') return '';
+                return unsafe
+                    .toString()
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            if (typeof CEXParser === 'undefined') {
+                showError("<strong>Error:</strong> CEXParser is not defined. Ensure cex-lib.js is loaded.");
+                return;
+            }
+            // URNTools is not directly used by hmtdse but HMTLib includes functions that do.
+            // if (typeof URNTools === 'undefined') {
+            //     showError("<strong>Error:</strong> URNTools is not defined. Ensure urn-lib.js is loaded.");
+            //     return;
+            // }
+            if (typeof HMTLib === 'undefined' ||
+                typeof HMTLib.hmtcurrent === 'undefined' ||
+                typeof HMTLib.hmtdse === 'undefined' ||
+                typeof HMTLib.DSERecord === 'undefined') {
+                showError("<strong>Error:</strong> HMTLib or its required components (hmtcurrent, hmtdse, DSERecord) are not defined. Ensure hmt-lib.js is loaded correctly.");
+                return;
+            }
+
+            try {
+                const parserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = `<p class="status success">HMT CEX data loaded successfully. Processing DSE records...</p>`;
+
+                const dseRecords = HMTLib.hmtdse(parserInstance);
+
+                totalCountSpan.textContent = dseRecords.length;
+
+                if (dseRecords.length > 0) {
+                    dseListDiv.innerHTML = ''; // Clear "No records" message
+                    const recordsToShow = Math.min(10, dseRecords.length);
+                    for (let i = 0; i < recordsToShow; i++) {
+                        const record = dseRecords[i];
+                        const recordDiv = document.createElement('div');
+                        recordDiv.classList.add('record');
+                        recordDiv.innerHTML = `
+                            <p><strong>Record ${i + 1}:</strong></p>
+                            <pre><strong>Passage:</strong> ${escapeHtml(record.passage)}\n<strong>ImageROI:</strong> ${escapeHtml(record.imageroi)}\n<strong>Surface:</strong> ${escapeHtml(record.surface)}</pre>
+                        `;
+                        dseListDiv.appendChild(recordDiv);
+                    }
+                } else {
+                    dseListDiv.innerHTML = '<p><em>No DSERecords found matching the criteria.</em></p>';
+                }
+
+                resultsDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status success">Processing complete.</p>`;
+
+                console.log("DSE Records found:", dseRecords.length);
+                console.log("First 10 DSE Records:", dseRecords.slice(0, 10));
+
+            } catch (error) {
+                showError(`<strong>Error during processing:</strong> ${error.message}`);
+                console.error("Error in runDseTest:", error);
+            }
+        }
+
+        runDseTest();
+    </script>
+</body>
+</html>
