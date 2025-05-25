@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMT Library Test - Metadata Label Functions</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        .results-section { border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; margin-top: 20px; }
+        .status { font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+        pre { background-color: #eef; padding: 10px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word; }
+        h2, h3 { margin-top: 1em; }
+    </style>
+    <!-- 1. Include cex-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include urn-lib.js (though not directly used by these new functions, good for HMTLib consistency) -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <!-- 3. Include your hmt-lib.js -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>HMT Library Test: Metadata Label Functions</h1>
+    <div id="loadingStatus">
+        <p class="status">Loading HMT CEX data... Please wait.</p>
+    </div>
+
+    <div id="testResults" style="display:none;">
+        <div class="results-section">
+            <h3>Test <code>collectionlabel</code></h3>
+            <p>For Collection URN: <code>urn:cite2:hmt:msA.v1:</code></p>
+            <p>Label found:</p>
+            <pre id="collectionLabelOutput">N/A</pre>
+        </div>
+
+        <div class="results-section">
+            <h3>Test <code>textlabel</code></h3>
+            <p>For Text URN: <code>urn:cts:greekLit:tlg0012.tlg001.msA:</code></p>
+            <p>Label found:</p>
+            <pre id="textLabelOutput">N/A</pre>
+        </div>
+    </div>
+
+    <div id="errorLog" style="display:none;" class="error"></div>
+
+    <script>
+        async function runMetadataLabelTest() {
+            const loadingStatusDiv = document.getElementById('loadingStatus');
+            const testResultsDiv = document.getElementById('testResults');
+            const errorLogDiv = document.getElementById('errorLog');
+
+            const collectionLabelOutputEl = document.getElementById('collectionLabelOutput');
+            const textLabelOutputEl = document.getElementById('textLabelOutput');
+
+            function showError(message, errorObj = null) {
+                errorLogDiv.innerHTML += `<p>${message}</p>`;
+                errorLogDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status error">An error occurred. Check console.</p>`;
+                console.error(message, errorObj || '');
+            }
+            
+            function escapeHtml(unsafe) {
+                if (unsafe === null || typeof unsafe === 'undefined') return 'Label not found or error.';
+                return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            }
+
+
+            if (typeof CEXParser === 'undefined' || typeof HMTLib === 'undefined' ||
+                !HMTLib.hmtcurrent || !HMTLib.collectionlabel || !HMTLib.textlabel) {
+                showError("<strong>Error:</strong> A required library (CEXParser, HMTLib) or HMTLib metadata function is not defined. Ensure all scripts are loaded correctly.");
+                return;
+            }
+
+            try {
+                const parserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = `<p class="status success">HMT CEX data loaded. Fetching labels...</p>`;
+                
+                // Test collectionlabel
+                const collectionUrnToTest = "urn:cite2:hmt:msA.v1:";
+                const foundCollectionLabel = HMTLib.collectionlabel(collectionUrnToTest, parserInstance);
+                collectionLabelOutputEl.textContent = escapeHtml(foundCollectionLabel);
+                console.log(`Test collectionlabel for ${collectionUrnToTest}:`, foundCollectionLabel);
+
+                // Test textlabel
+                const textUrnToTest = "urn:cts:greekLit:tlg0012.tlg001.msA:";
+                const foundTextLabel = HMTLib.textlabel(textUrnToTest, parserInstance);
+                textLabelOutputEl.textContent = escapeHtml(foundTextLabel);
+                console.log(`Test textlabel for ${textUrnToTest}:`, foundTextLabel);
+
+
+                testResultsDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status success">Metadata label tests complete.</p>`;
+
+            } catch (error) {
+                showError(`<strong>Error during main test execution:</strong> ${error.message}`, error);
+            }
+        }
+
+        runMetadataLabelTest();
+    </script>
+</body>
+</html>
