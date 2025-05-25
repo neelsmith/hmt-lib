@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMT Library Test - Codex Function</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        .results-section { border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; margin-top: 20px; }
+        .status { font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+        pre { background-color: #eef; padding: 10px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; }
+        h2, h3 { margin-top: 1em; }
+        .page-item { border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 5px; }
+        .page-item:last-child { border-bottom: none; }
+    </style>
+    <!-- 1. Include cex-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include urn-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <!-- 3. Include your hmt-lib.js -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>HMT Library Test: <code>codex</code> Function</h1>
+    <div id="loadingStatus">
+        <p class="status">Loading HMT CEX data and processing codex pages... Please wait.</p>
+    </div>
+
+    <div id="testResults" style="display:none;">
+        <div class="results-section">
+            <h3>Test <code>codex</code> for URN Prefix: <code id="testedCodexUrn"></code></h3>
+            <p>Total number of CodexPage objects found: <strong id="totalCodexPages">N/A</strong></p>
+            <p>First 10 CodexPage Objects (if available):</p>
+            <pre id="codexPagesOutput">N/A</pre>
+        </div>
+    </div>
+
+    <div id="errorLog" style="display:none;" class="error"></div>
+
+    <script>
+        async function runCodexTest() {
+            const loadingStatusDiv = document.getElementById('loadingStatus');
+            const testResultsDiv = document.getElementById('testResults');
+            const errorLogDiv = document.getElementById('errorLog');
+
+            const testedCodexUrnEl = document.getElementById('testedCodexUrn');
+            const totalCodexPagesEl = document.getElementById('totalCodexPages');
+            const codexPagesOutputEl = document.getElementById('codexPagesOutput');
+
+            function showError(message, errorObj = null) {
+                errorLogDiv.innerHTML += `<p>${message}</p>`;
+                errorLogDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status error">An error occurred. Check console.</p>`;
+                console.error(message, errorObj || '');
+            }
+
+            function escapeHtml(unsafe) {
+                if (unsafe === null || typeof unsafe === 'undefined') return 'null';
+                return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            }
+            
+            function formatCodexPage(page) {
+                return `  Sequence: ${escapeHtml(page.sequence)}\n` +
+                       `  Label:    ${escapeHtml(page.label)}\n` +
+                       `  URN:      ${escapeHtml(page.urn)}\n` +
+                       `  Image:    ${escapeHtml(page.image)}\n` +
+                       `  R/V:      ${escapeHtml(page.rv)}`;
+            }
+
+            if (typeof CEXParser === 'undefined' || typeof URNTools === 'undefined' || typeof HMTLib === 'undefined' ||
+                !HMTLib.hmtcurrent || !HMTLib.CodexPage || !HMTLib.codex) {
+                showError("<strong>Error:</strong> A required library (CEXParser, URNTools, HMTLib) or HMTLib codex function/class is not defined. Ensure all scripts are loaded correctly.");
+                return;
+            }
+
+            const codexUrnToTest = "urn:cite2:hmt:msA.v1:";
+            testedCodexUrnEl.textContent = codexUrnToTest;
+
+            try {
+                const parserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = `<p class="status success">HMT CEX data loaded. Processing codex pages for ${codexUrnToTest}...</p>`;
+                
+                const codexPages = HMTLib.codex(parserInstance, codexUrnToTest);
+                console.log(`CodexPage objects found by HMTLib.codex for ${codexUrnToTest}: ${codexPages.length}`);
+                console.log("First few codex pages:", codexPages.slice(0,5));
+
+                totalCodexPagesEl.textContent = codexPages.length;
+
+                if (codexPages.length > 0) {
+                    let output = "";
+                    const limit = Math.min(10, codexPages.length);
+                    for (let i = 0; i < limit; i++) {
+                        output += `Page Record ${i + 1} (of ${codexPages.length}):\n${formatCodexPage(codexPages[i])}\n\n`;
+                    }
+                    if (codexPages.length > 10) {
+                        output += `... and ${codexPages.length - 10} more records not shown.`;
+                    }
+                    codexPagesOutputEl.textContent = output.trim();
+                } else {
+                    codexPagesOutputEl.textContent = "No CodexPage objects found matching the criteria.";
+                }
+
+                testResultsDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status success">Codex processing complete.</p>`;
+
+            } catch (error) {
+                showError(`<strong>Error during main test execution:</strong> ${error.message}`, error);
+            }
+        }
+
+        runCodexTest();
+    </script>
+</body>
+</html>
