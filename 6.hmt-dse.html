@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMT Library Test - DSE Record Queries</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        .results-section { border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; margin-top: 20px; }
+        .status { font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+        pre { background-color: #eef; padding: 10px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto; }
+        h2, h3 { margin-top: 1em; }
+    </style>
+    <!-- 1. Include cex-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include urn-lib.js (HMTLib uses it for other functions) -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <!-- 3. Include your hmt-lib.js (ensure this path is correct) -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>HMT Library Test: DSE Record Query Functions</h1>
+    <div id="loadingStatus">
+        <p class="status">Loading HMT CEX data and DSE records... Please wait.</p>
+    </div>
+
+    <div id="testResults" style="display:none;">
+        <div class="results-section">
+            <h3>Test <code>recordsforpage</code></h3>
+            <p>Searching for page: <code>urn:cite2:hmt:msA.v1:13r</code></p>
+            <p>Number of records found: <strong id="recordsForPageCount">N/A</strong></p>
+            <p>Matching records (displaying properties of first 5, if any):</p>
+            <pre id="recordsForPageOutput">N/A</pre>
+        </div>
+
+        <div class="results-section">
+            <h3>Test <code>recordforpassage</code></h3>
+            <p>Searching for passage: <code>urn:cts:greekLit:tlg0012.tlg001.msA:1.1</code></p>
+            <p>Matching record (displaying properties, if any):</p>
+            <pre id="recordForPassageOutput">N/A</pre>
+        </div>
+
+        <div class="results-section">
+            <h3>Test <code>imageforpage</code></h3>
+            <p>Searching for image for page: <code>urn:cite2:hmt:e3pages.v1:98r</code></p>
+            <p>Image URN found:</p>
+            <pre id="imageForPageOutput">N/A</pre>
+        </div>
+    </div>
+
+    <div id="errorLog" style="display:none;" class="error"></div>
+
+    <script>
+        async function runDseQueryTest() {
+            const loadingStatusDiv = document.getElementById('loadingStatus');
+            const testResultsDiv = document.getElementById('testResults');
+            const errorLogDiv = document.getElementById('errorLog');
+
+            const recordsForPageCountEl = document.getElementById('recordsForPageCount');
+            const recordsForPageOutputEl = document.getElementById('recordsForPageOutput');
+            const recordForPassageOutputEl = document.getElementById('recordForPassageOutput');
+            const imageForPageOutputEl = document.getElementById('imageForPageOutput');
+
+            function showError(message, errorObj = null) {
+                errorLogDiv.innerHTML += `<p>${message}</p>`;
+                errorLogDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status error">An error occurred. Check console for details.</p>`;
+                console.error(message, errorObj || '');
+            }
+
+            function escapeHtml(unsafe) {
+                if (unsafe === null || typeof unsafe === 'undefined') return 'null';
+                return unsafe
+                    .toString()
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
+            function formatDSERecordsForDisplay(recordsArray, maxToShow = 5) {
+                if (!recordsArray || recordsArray.length === 0) {
+                    return "No records found.";
+                }
+                let output = "";
+                const showCount = Math.min(recordsArray.length, maxToShow);
+                for (let i = 0; i < showCount; i++) {
+                    const r = recordsArray[i];
+                    output += `Record ${i+1} of ${recordsArray.length}:\n` +
+                              `  Passage: ${escapeHtml(r.passage)}\n` +
+                              `  ImageROI: ${escapeHtml(r.imageroi)}\n` +
+                              `  Surface: ${escapeHtml(r.surface)}\n\n`;
+                }
+                if (recordsArray.length > maxToShow) {
+                    output += `... and ${recordsArray.length - maxToShow} more records not shown.`;
+                }
+                return output.trim();
+            }
+            
+            function formatDSERecordForDisplay(record) {
+                if (!record) {
+                    return "Record not found (result is null).";
+                }
+                 return `Passage: ${escapeHtml(record.passage)}\n` +
+                        `ImageROI: ${escapeHtml(record.imageroi)}\n` +
+                        `Surface: ${escapeHtml(record.surface)}`;
+            }
+
+
+            if (typeof CEXParser === 'undefined' || typeof URNTools === 'undefined' || typeof HMTLib === 'undefined' ||
+                !HMTLib.hmtcurrent || !HMTLib.hmtdse || !HMTLib.DSERecord ||
+                !HMTLib.recordsforpage || !HMTLib.recordforpassage || !HMTLib.imageforpage) {
+                showError("<strong>Error:</strong> A required library (CEXParser, URNTools, HMTLib) or HMTLib function is not defined. Ensure all scripts are loaded correctly.");
+                return;
+            }
+
+            try {
+                const parserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = `<p class="status success">HMT CEX data loaded. Processing DSE records...</p>`;
+                
+                const allDseRecords = HMTLib.hmtdse(parserInstance);
+                console.log(`Total DSE Records fetched by hmtdse: ${allDseRecords.length}`);
+
+                if (allDseRecords.length === 0) {
+                    // This could happen if the targetRelationSetUrn is not found or has no data.
+                    showError("Warning: No DSE records were found by `hmtdse`. The tests for DSE query functions might yield empty results or nulls.");
+                    // Allow tests to proceed to see if they handle empty arrays gracefully.
+                }
+                loadingStatusDiv.innerHTML = `<p class="status success">DSE records processed (${allDseRecords.length} found). Running query tests...</p>`;
+
+
+                // Test recordsforpage
+                const pageUrnForRecordsTest = "urn:cite2:hmt:msA.v1:13r";
+                const foundPageRecords = HMTLib.recordsforpage(pageUrnForRecordsTest, allDseRecords);
+                recordsForPageCountEl.textContent = foundPageRecords.length;
+                recordsForPageOutputEl.textContent = formatDSERecordsForDisplay(foundPageRecords);
+                console.log(`Test recordsforpage with URN ${pageUrnForRecordsTest}: Found ${foundPageRecords.length} records.`, foundPageRecords.slice(0,5));
+
+                // Test recordforpassage
+                const passageUrnForRecordTest = "urn:cts:greekLit:tlg0012.tlg001.msA:1.1";
+                const foundPassageRecord = HMTLib.recordforpassage(passageUrnForRecordTest, allDseRecords);
+                recordForPassageOutputEl.textContent = formatDSERecordForDisplay(foundPassageRecord);
+                console.log(`Test recordforpassage with URN ${passageUrnForRecordTest}:`, foundPassageRecord);
+
+                // Test imageforpage
+                const pageUrnForImageTest = "urn:cite2:hmt:e3pages.v1:98r";
+                const foundImageUrn = HMTLib.imageforpage(pageUrnForImageTest, allDseRecords);
+                imageForPageOutputEl.textContent = escapeHtml(foundImageUrn) || "Image URN not found (result is null).";
+                console.log(`Test imageforpage with URN ${pageUrnForImageTest}: Result is '${foundImageUrn}'`);
+
+                testResultsDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status success">All DSE query tests complete.</p>`;
+
+            } catch (error) {
+                showError(`<strong>Error during main test execution:</strong> ${error.message}`, error);
+            }
+        }
+
+        runDseQueryTest();
+    </script>
+</body>
+</html>
