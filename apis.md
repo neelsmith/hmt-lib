@@ -25,7 +25,7 @@ Include `cex-lib.js`, `urn-lib.js`, and then `hmt-lib.js` in your HTML file:
 ```html
 <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
 <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
-<script src="path/to/hmt-lib.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/neelsmith/hmt-lib/hmt-lib.js"></script>
 <script>
     // Example usage:
     async function main() {
