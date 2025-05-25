@@ -23,7 +23,9 @@ In addition to the library itself (`hmt-lib.js`) and the documentation (`apis.md
 - `5.hmt-dse.html`: illustrates how to load the DSE records from the HMT archive.
 - `6.hmt-dse.html`: illustrates how to load the DSE records from the HMT archive.
 - `7.hmt-scholia.html`: illustrates how to load and query an index linking *Iliad* passages and *scholia*.
+- `8.hmt-codex.html`: illustrates how load a list of `CodexPage` objects for a given manuscript.
 - `9.hmt-catalogs.html`: illustrates how to find human-readable labels for objects cited by CITE2 URN or CTS URN.
+- `14.hmt-codex.html`: illustrates how to use the `codexlist` function to find URNs of all documented codices.
 
 
 
