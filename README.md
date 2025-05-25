@@ -19,7 +19,11 @@ The javascript library in [hmt-lib.js](./hmt-lib.js) is designed to facilitate t
 In addition to the library itself (`hmt-lib.js`) and the documentation (`apis.md`), this repository includes the following web illustrations of the library's functionality:
 
 - `1.hmt-load.html`: illustrates how to load the current release of the Homer Multitext project into a parsed object.
-- `9.hmt-catalogs.html`: illustrates how to load the current release of the Homer Multitext project into a parsed object and then extract the catalogs of the DSE records.
+- `4.hmt-texts.html`: illustrates how to load either a normalized or diplomatic corpus of the texts in the HMT archive. 
+- `5.hmt-dse.html`: illustrates how to load the DSE records from the HMT archive.
+- `6.hmt-dse.html`: illustrates how to load the DSE records from the HMT archive.
+- `7.hmt-scholia.html`: illustrates how to load and query an index linking *Iliad* passages and *scholia*.
+- `9.hmt-catalogs.html`: illustrates how to find human-readable labels for objects cited by CITE2 URN or CTS URN.
 
 
 
