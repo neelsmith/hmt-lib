@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMT Library Test - codexlist</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        .status { font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+        #resultsContainer { margin-top: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f9f9f9; }
+        pre { background-color: #eef; padding: 10px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+    <!-- 1. Include cex-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include urn-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <!-- 3. Include your hmt-lib.js -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>HMT Library Test: <code>codexlist</code> Function</h1>
+    <div id="loadingStatus">
+        <p class="status">Loading HMT CEX data... Please wait.</p>
+    </div>
+
+    <div id="resultsContainer" style="display:none;">
+        <h3>Codex URNs found by <code>codexlist</code>:</h3>
+        <pre id="codexListOutput">N/A</pre>
+    </div>
+
+    <div id="errorLog" style="display:none;" class="error"></div>
+
+    <script>
+        async function runCodexListTest() {
+            const loadingStatusDiv = document.getElementById('loadingStatus');
+            const resultsContainerDiv = document.getElementById('resultsContainer');
+            const codexListOutputEl = document.getElementById('codexListOutput');
+            const errorLogDiv = document.getElementById('errorLog');
+
+            function showError(message, errorObj = null) {
+                errorLogDiv.innerHTML += `<p>${message}</p>`;
+                errorLogDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status error">An error occurred. Check console.</p>`;
+                console.error(message, errorObj || '');
+            }
+            
+            function escapeHtml(unsafe) {
+                if (unsafe === null || typeof unsafe === 'undefined') return 'null';
+                return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            }
+
+            if (typeof CEXParser === 'undefined' || typeof URNTools === 'undefined' || typeof HMTLib === 'undefined' ||
+                !HMTLib.hmtcurrent || !HMTLib.codexlist ) {
+                showError("<strong>Error:</strong> A required library (CEXParser, URNTools, HMTLib) or HMTLib.codexlist function is not defined. Ensure all scripts are loaded correctly.");
+                return;
+            }
+
+            try {
+                const parserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = `<p class="status success">HMT CEX data loaded. Generating codex list...</p>`;
+                
+                const codexUrns = HMTLib.codexlist(parserInstance);
+
+                if (codexUrns.length > 0) {
+                    codexListOutputEl.textContent = codexUrns.map(urn => escapeHtml(urn)).join('\n');
+                } else {
+                    codexListOutputEl.textContent = "No codex URNs found or an error occurred.";
+                }
+                
+                resultsContainerDiv.style.display = 'block';
+                loadingStatusDiv.innerHTML = `<p class="status success">Codex list generated.</p>`;
+                console.log("Codex URNs from codexlist:", codexUrns);
+
+            } catch (error) {
+                showError(`<strong>Error during main test execution:</strong> ${error.message}`, error);
+            }
+        }
+
+        runCodexListTest();
+    </script>
+</body>
+</html>
