@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HMTLib textlabel Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #output { border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9; }
+        .test-item { margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
+        .info { color: blue; }
+        .error { color: red; font-weight: bold; }
+        pre { white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+    <!-- Using CDN links for dependencies -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <script src="hmt-lib.js"></script> <!-- Your HMTLib with the modified textlabel -->
+</head>
+<body>
+    <h1>HMTLib <code>textlabel</code> Function Test (with Normalization)</h1>
+    <div id="output">
+        <p class="info">Loading HMT data... This may take a moment.</p>
+        <p class="info">Ensure <code>hmt-lib.js</code> is in the same directory or correctly pathed and contains the updated <code>textlabel</code> function.</p>
+    </div>
+
+    <script>
+        const outputDiv = document.getElementById('output');
+
+        function logHtmlToPage(htmlContent) {
+            const div = document.createElement('div');
+            div.innerHTML = htmlContent;
+            outputDiv.appendChild(div);
+        }
+
+        async function runTextLabelTests() {
+            if (typeof CEXParser === 'undefined' || typeof URNTools === 'undefined' || typeof HMTLib === 'undefined' || typeof HMTLib.textlabel !== 'function') {
+                logHtmlToPage("<p class='error'>Error: Essential libraries (CEXParser, URNTools, HMTLib, or HMTLib.textlabel) are not loaded. Testing cannot proceed. Check script paths and console.</p>");
+                const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+                initialInfoMessages.forEach(msg => msg.style.display = 'none'); // Hide loading messages
+                return;
+            }
+
+            let parserInstance;
+            try {
+                logHtmlToPage("<p>Attempting to load hmt-current.cex...</p>");
+                parserInstance = await HMTLib.hmtcurrent();
+                logHtmlToPage("<p>HMT data loaded successfully. Parser instance created.</p>");
+            } catch (error) {
+                console.error("Error loading HMT data:", error);
+                logHtmlToPage(`<p class="error">Failed to load HMT data: ${error.message}. Testing cannot proceed.</p>`);
+                const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+                initialInfoMessages.forEach(msg => msg.style.display = 'none');
+                return;
+            }
+            
+            const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+            initialInfoMessages.forEach(msg => msg.remove());
+
+            logHtmlToPage("<h2>Testing <code>textlabel</code> with various URNs:</h2>");
+
+            const testUrns = [
+                "urn:cts:greekLit:tlg0012.tlg001.msA:1.1",
+                "urn:cts:greekLit:tlg0012.tlg001.msA.normalized:1.1",
+                "urn:cts:greekLit:tlg0012.tlg001.msA:",
+                "urn:cts:greekLit:tlg5026.msAint.hmt:1.28lemma", // Test with different structure for scholia
+                "urn:cts:greekLit:tlg5026.msAint.hmt.diplomatic:1.28", // Test with scholia and 4-part work ID
+                "urn:cts:greekLit:tlg0012.tlg001.fake:" // Test a URN that shouldn't be in the catalog
+            ];
+
+            testUrns.forEach(urn => {
+                let testOutput = `<div class="test-item">`;
+                testOutput += `<p><strong>Input URN:</strong> <code>${urn}</code></p>`;
+                
+                const label = HMTLib.textlabel(urn, parserInstance);
+                
+                testOutput += `<p><strong>Processed Search URN (internal to textlabel):</strong> (See console logs in hmt-lib.js if enabled)</p>`;
+                if (label) {
+                    testOutput += `<p><strong>Returned Label:</strong> ${label}</p>`;
+                } else {
+                    testOutput += `<p><strong>Returned Label:</strong> <span class="error">null (No label found or error during processing)</span></p>`;
+                }
+                testOutput += `</div>`;
+                logHtmlToPage(testOutput);
+            });
+
+            logHtmlToPage("<p>All <code>textlabel</code> tests completed.</p>");
+        }
+
+        document.addEventListener('DOMContentLoaded', runTextLabelTests);
+    </script>
+</body>
+</html>
