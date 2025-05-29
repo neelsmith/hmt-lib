@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HMTLib iliadbooks Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #controlPanel { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f0f0f0;}
+        #menuContainer { margin-bottom: 10px; }
+        #selectionDisplay, #booksDisplay { margin-top: 10px; padding: 10px; border: 1px solid #ddd; background-color: #e9e9e9;}
+        #booksDisplay ul { list-style-type: none; padding-left: 0; }
+        #booksDisplay li { margin-bottom: 3px; }
+        .info { color: blue; }
+        .error { color: red; font-weight: bold; }
+        #loadingStatus { margin-top: 20px; }
+    </style>
+    <!-- Using CDN links for dependencies -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <script src="hmt-lib.js"></script> <!-- Your HMTLib with the new iliadbooks function -->
+</head>
+<body>
+    <h1>HMTLib <code>iliadbooks</code> Function Test</h1>
+    
+    <div id="controlPanel">
+        <h2>Select an Iliad Version:</h2>
+        <div id="menuContainer">
+            <!-- The iliadsmenu will be inserted here -->
+            <p class="info">Loading Iliad versions menu...</p>
+        </div>
+        <div id="selectionDisplay">
+            <p>No Iliad version selected yet.</p>
+        </div>
+    </div>
+
+    <div id="booksDisplay">
+        <h3>Books Found in Selected Iliad:</h3>
+        <p>Select an Iliad version to see available books.</p>
+        <ul></ul>
+    </div>
+    <div id="loadingStatus">
+         <p class="info">Loading HMT data... This may take a moment.</p>
+    </div>
+
+
+    <script>
+        const menuContainerDiv = document.getElementById('menuContainer');
+        const selectionDisplayDiv = document.getElementById('selectionDisplay');
+        const booksDisplayDiv = document.getElementById('booksDisplay');
+        const booksListUl = booksDisplayDiv.querySelector('ul');
+        const loadingStatusDiv = document.getElementById('loadingStatus');
+
+        let hmtParserInstance = null;
+        let diplomaticCorpus = null; // To store the diplomatic corpus once loaded
+
+        function updateSelectionDisplay(selectElement) {
+            const selectedValue = selectElement.value;
+            const selectedOption = selectElement.options[selectElement.selectedIndex];
+            const selectedText = selectedOption ? selectedOption.text : "N/A";
+
+            if (selectedValue) {
+                selectionDisplayDiv.innerHTML = `<p><strong>Selected Iliad URN:</strong> <code>${selectedValue}</code></p>
+                                                 <p><strong>Display Label:</strong> ${selectedText}</p>`;
+                fetchAndDisplayBooks(selectedValue);
+            } else {
+                selectionDisplayDiv.innerHTML = `<p>No Iliad version selected yet.</p>`;
+                booksDisplayDiv.querySelector('h3').textContent = "Books Found in Selected Iliad:";
+                booksListUl.innerHTML = '<li>Select an Iliad version to see available books.</li>';
+            }
+        }
+
+        function fetchAndDisplayBooks(iliadUrn) {
+            if (!hmtParserInstance) {
+                booksListUl.innerHTML = '<li class="error">HMT Parser not initialized.</li>';
+                return;
+            }
+            if (!diplomaticCorpus) { // Load diplomatic corpus if not already loaded
+                loadingStatusDiv.innerHTML = '<p class="info">Loading diplomatic text corpus for book listing...</p>';
+                try {
+                    diplomaticCorpus = HMTLib.hmtdiplomatic(hmtParserInstance); // This should return an array of strings
+                    loadingStatusDiv.innerHTML = '<p class="info">Diplomatic corpus loaded.</p>';
+                } catch (e) {
+                    console.error("Error loading diplomatic corpus:", e);
+                    loadingStatusDiv.innerHTML = `<p class="error">Error loading diplomatic corpus: ${e.message}</p>`;
+                    booksListUl.innerHTML = `<li class="error">Failed to load diplomatic corpus.</li>`;
+                    return;
+                }
+            }
+
+
+            booksDisplayDiv.querySelector('h3').textContent = `Books for: ${iliadUrn}`;
+            booksListUl.innerHTML = '<li>Loading books...</li>';
+
+            try {
+                const books = HMTLib.iliadbooks(iliadUrn, diplomaticCorpus);
+                if (books.length > 0) {
+                    booksListUl.innerHTML = books.map(book => `<li>Book ${book}</li>`).join('');
+                } else {
+                    booksListUl.innerHTML = '<li>No books found for this version in the diplomatic corpus (or corpus empty/mismatched).</li>';
+                }
+            } catch (e) {
+                console.error("Error in HMTLib.iliadbooks:", e);
+                booksListUl.innerHTML = `<li class="error">Error fetching books: ${e.message}</li>`;
+            }
+        }
+
+
+        async function initializePage() {
+            if (typeof CEXParser === 'undefined' || 
+                typeof URNTools === 'undefined' || 
+                typeof HMTLib === 'undefined' || 
+                typeof HMTLib.iliadsmenu !== 'function' ||
+                typeof HMTLib.iliadbooks !== 'function' ||
+                typeof HMTLib.hmtdiplomatic !== 'function') {
+                loadingStatusDiv.innerHTML = "<p class='error'>Error: Essential libraries or HMTLib functions are not loaded. Testing cannot proceed. Check script paths and console.</p>";
+                menuContainerDiv.innerHTML = "<p class='error'>Cannot load menu.</p>";
+                return;
+            }
+
+            try {
+                hmtParserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = "<p class='info'>HMT data loaded successfully. Parser instance created.</p>";
+                
+                // Pre-load diplomatic corpus
+                loadingStatusDiv.innerHTML = '<p class="info">Pre-loading diplomatic text corpus...</p>';
+                try {
+                    diplomaticCorpus = HMTLib.hmtdiplomatic(hmtParserInstance);
+                    loadingStatusDiv.innerHTML = '<p class="info">Diplomatic corpus pre-loaded.</p>';
+                } catch (e) {
+                    console.error("Error pre-loading diplomatic corpus:", e);
+                    loadingStatusDiv.innerHTML = `<p class="error">Error pre-loading diplomatic corpus: ${e.message}</p>`;
+                    // Allow to proceed, will try to load later if needed
+                }
+
+
+                const menuName = "iliadSelector";
+                const menuId = "iliad_select_id";
+                const menuHtml = HMTLib.iliadsmenu(hmtParserInstance, menuName, menuId);
+                
+                menuContainerDiv.innerHTML = menuHtml;
+                loadingStatusDiv.innerHTML += "<p class='info'>Iliads menu generated. Select an Iliad version.</p>";
+
+                const selectElement = document.getElementById(menuId);
+                if (selectElement) {
+                    selectElement.addEventListener('change', function() {
+                        updateSelectionDisplay(this);
+                    });
+                    updateSelectionDisplay(selectElement); // Initial call
+                } else {
+                    loadingStatusDiv.innerHTML += "<p class='error'>Could not find the generated select menu by ID.</p>";
+                }
+
+            } catch (error) {
+                console.error("Error during initialization:", error);
+                loadingStatusDiv.innerHTML = `<p class="error">Failed to initialize: ${error.message}.</p>`;
+                menuContainerDiv.innerHTML = "<p class='error'>Cannot load menu due to initialization error.</p>";
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initializePage);
+    </script>
+</body>
+</html>
