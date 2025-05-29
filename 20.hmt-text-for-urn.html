@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMT Library Test - text_for_hmturn</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.6; padding: 20px; }
+        .status { font-weight: bold; }
+        .error { color: red; }
+        .success { color: green; }
+        .test-group { margin-bottom: 30px; padding-bottom: 15px; border-bottom: 2px solid #ddd; }
+        .test-case { border: 1px solid #ccc; padding: 15px; background-color: #f9f9f9; margin-top: 10px; }
+        pre { background-color: #eef; padding: 10px; border-radius: 3px; white-space: pre-wrap; word-wrap: break-word; max-height: 300px; overflow-y: auto;}
+        h2, h3 { margin-top: 1em; }
+    </style>
+    <!-- 1. Include cex-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <!-- 2. Include urn-lib.js -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <!-- 3. Include your hmt-lib.js -->
+    <script src="hmt-lib.js"></script>
+</head>
+<body>
+    <h1>HMT Library Test: <code>text_for_hmturn</code> Function</h1>
+    <div id="loadingStatus">
+        <p class="status">Loading HMT CEX data and preparing tests... Please wait.</p>
+    </div>
+
+    <div id="testSummary">
+        <!-- Summary will be populated here -->
+    </div>
+
+    <div id="testResultsContainer">
+        <!-- Test results will be appended here -->
+    </div>
+
+    <div id="errorLog" style="display:none;" class="error"></div>
+
+    <script>
+        async function runTextForHmtUrnTests() {
+            const resultsContainer = document.getElementById('testResultsContainer');
+            const errorLogDiv = document.getElementById('errorLog');
+            const loadingStatusDiv = document.getElementById('loadingStatus');
+            const testSummaryDiv = document.getElementById('testSummary');
+
+            function showError(message, errorObj = null) {
+                errorLogDiv.innerHTML += `<p>${message}</p>`;
+                errorLogDiv.style.display = 'block';
+                console.error(message, errorObj || '');
+                loadingStatusDiv.innerHTML = `<p class="status error">An error occurred. Check console.</p>`;
+            }
+            
+            function escapeHtml(unsafe) {
+                if (unsafe === null || typeof unsafe === 'undefined') return 'null';
+                return unsafe.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            }
+
+            function displayTestResult(groupTitle, testTitle, inputUrn, exemplarId, actualText) {
+                // Find or create group div
+                let groupDiv = document.getElementById(`group-${groupTitle.replace(/\s+/g, '-')}`);
+                if (!groupDiv) {
+                    groupDiv = document.createElement('div');
+                    groupDiv.classList.add('test-group');
+                    groupDiv.id = `group-${groupTitle.replace(/\s+/g, '-')}`;
+                    groupDiv.innerHTML = `<h2>${escapeHtml(groupTitle)}</h2>`;
+                    resultsContainer.appendChild(groupDiv);
+                }
+
+                const testCaseDiv = document.createElement('div');
+                testCaseDiv.classList.add('test-case');
+                
+                let resultHtml = `<h3>${escapeHtml(testTitle)}</h3>`;
+                resultHtml += `<p><strong>Input URN:</strong> ${escapeHtml(inputUrn)}</p>`;
+                resultHtml += `<p><strong>Exemplar ID Used:</strong> "${escapeHtml(exemplarId)}"</p>`;
+                resultHtml += `<p><strong>Text Found:</strong></p><pre>${actualText ? escapeHtml(actualText) : "<em>No text found or empty string returned.</em>"}</pre>`;
+                
+                testCaseDiv.innerHTML = resultHtml;
+                groupDiv.appendChild(testCaseDiv);
+            }
+
+            // Check if HMTLib and necessary components are loaded
+            if (typeof CEXParser === 'undefined' || typeof URNTools === 'undefined' || typeof HMTLib === 'undefined' ||
+                !HMTLib.hmtcurrent || !HMTLib.hmtdse || !HMTLib.hmtscholia || !HMTLib.hmtnormalized || 
+                !HMTLib.DSERecord || !HMTLib.Scholion || !HMTLib.text_for_hmturn) {
+                showError("<strong>Error:</strong> A required library or HMTLib function is not defined. Ensure all scripts are loaded correctly.");
+                loadingStatusDiv.innerHTML = `<p class="status error">HMTLib not fully loaded.</p>`;
+                return;
+            }
+            
+            try {
+                loadingStatusDiv.innerHTML = `<p class="status">Loading current HMT release...</p>`;
+                const parserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = `<p class="status success">HMT CEX data loaded. Fetching DSE records, scholia, and normalized corpus...</p>`;
+
+                const allDseRecords = HMTLib.hmtdse(parserInstance);
+                const allScholiaRecords = HMTLib.hmtscholia(parserInstance);
+                const normalizedTextLinesArray = HMTLib.hmtnormalized(parserInstance);
+                const normalizedCorpusString = normalizedTextLinesArray.join("\n");
+
+                testSummaryDiv.innerHTML = `
+                    <p>Total DSE Records found: ${allDseRecords.length}</p>
+                    <p>Total Scholion Records found: ${allScholiaRecords.length}</p>
+                    <p>Normalized corpus lines loaded: ${normalizedTextLinesArray.length}</p>
+                `;
+                if (!normalizedCorpusString) {
+                     console.warn("The normalized corpus string is empty. Text lookups might not find anything.");
+                }
+
+                // --- Test with DSE Records ---
+                const dseTestGroupTitle = "Tests with DSE Record Passages";
+                if (allDseRecords.length > 0) {
+                    const numDseToSelect = Math.min(5, allDseRecords.length);
+                    const dseRecordsCopy = [...allDseRecords];
+                    for (let i = 0; i < numDseToSelect; i++) {
+                        const randomIndex = Math.floor(Math.random() * dseRecordsCopy.length);
+                        const dseRecord = dseRecordsCopy.splice(randomIndex, 1)[0];
+                        const exemplarId = "normalized";
+                        let foundText = "";
+                        try {
+                            foundText = HMTLib.text_for_hmturn(dseRecord.passage, exemplarId, normalizedCorpusString);
+                        } catch (e) {
+                            showError(`Error during text_for_hmturn for DSE passage ${dseRecord.passage}: ${e.message}`, e);
+                            foundText = `ERROR: ${e.message}`;
+                        }
+                        displayTestResult(dseTestGroupTitle, `DSE Test ${i + 1}`, dseRecord.passage, exemplarId, foundText);
+                    }
+                } else {
+                     resultsContainer.innerHTML += `<div class="test-group"><h2>${dseTestGroupTitle}</h2><p class="error">No DSE records to test.</p></div>`;
+                }
+
+                // --- Test with Scholion Records ---
+                const scholiaTestGroupTitle = "Tests with Scholion Object Properties";
+                if (allScholiaRecords.length > 0) {
+                    const numScholiaToSelect = Math.min(3, allScholiaRecords.length);
+                    const scholiaRecordsCopy = [...allScholiaRecords];
+
+                    for (let i = 0; i < numScholiaToSelect; i++) {
+                        const randomIndex = Math.floor(Math.random() * scholiaRecordsCopy.length);
+                        const scholionRecord = scholiaRecordsCopy.splice(randomIndex, 1)[0];
+                        const exemplarId = "normalized";
+                        
+                        // Test with Scholion.scholion
+                        let foundTextScholion = "";
+                        try {
+                            foundTextScholion = HMTLib.text_for_hmturn(scholionRecord.scholion, exemplarId, normalizedCorpusString);
+                        } catch (e) {
+                            showError(`Error for Scholion.scholion ${scholionRecord.scholion}: ${e.message}`, e);
+                            foundTextScholion = `ERROR: ${e.message}`;
+                        }
+                        displayTestResult(scholiaTestGroupTitle, `Scholion Test ${i + 1} (using .scholion property)`, scholionRecord.scholion, exemplarId, foundTextScholion);
+
+                        // Test with Scholion.iliad
+                        let foundTextIliad = "";
+                        try {
+                            foundTextIliad = HMTLib.text_for_hmturn(scholionRecord.iliad, exemplarId, normalizedCorpusString);
+                        } catch (e) {
+                            showError(`Error for Scholion.iliad ${scholionRecord.iliad}: ${e.message}`, e);
+                            foundTextIliad = `ERROR: ${e.message}`;
+                        }
+                        displayTestResult(scholiaTestGroupTitle, `Scholion Test ${i + 1} (using .iliad property)`, scholionRecord.iliad, exemplarId, foundTextIliad);
+                    }
+                } else {
+                     resultsContainer.innerHTML += `<div class="test-group"><h2>${scholiaTestGroupTitle}</h2><p class="error">No Scholion records to test.</p></div>`;
+                }
+
+                loadingStatusDiv.innerHTML = `<p class="status success">Dynamic tests complete. Check results below.</p>`;
+
+            } catch (error) {
+                showError(`<strong>Error during main test execution:</strong> ${error.message}`, error);
+            }
+        }
+
+        runTextForHmtUrnTests();
+    </script>
+</body>
+</html>

@@ -7,7 +7,6 @@
     }
 
     // --- CLASSES ---
-    // (DSERecord, Scholion, CodexPage classes remain as they were)
     class DSERecord {
         constructor(passage, imageroi, surface) {
             this.passage = passage;
@@ -15,12 +14,14 @@
             this.surface = surface;
         }
     }
+
     class Scholion {
         constructor(scholionUrn, iliadUrn) {
             this.scholion = scholionUrn;
             this.iliad = iliadUrn;
         }
     }
+
     class CodexPage {
         constructor(sequence, image, urn, rv, label) {
             this.sequence = parseFloat(sequence);
@@ -32,9 +33,9 @@
     }
 
     // --- CORE HMT FUNCTIONS ---
-    // (All previous functions: hmtcurrent, hmtnormalized, hmtdiplomatic, hmtdse, 
-    //  DSE queries, hmtscholia, scholia queries, codex, collectionlabel, 
-    //  textlabel, codexlist, codexmenu, text_for_dserecord - remain as they were)
+    // (hmtcurrent, hmtnormalized, hmtdiplomatic, hmtdse, recordsforpage, recordforpassage, 
+    //  imageforpage, hmtscholia, passageforscholion, scholiaforpassage, codex, 
+    //  collectionlabel, textlabel, codexlist - these functions remain as they were)
     function hmtcurrent() {
         const hmtCurrentCexUrl = "https://raw.githubusercontent.com/homermultitext/hmt-archive/refs/heads/master/releases-cex/hmt-current.cex";
         if (typeof CEXParser === 'undefined') { console.error("hmtcurrent: CEXParser not defined."); return Promise.reject(new Error("CEXParser not defined.")); }
@@ -278,46 +279,39 @@
         }
         return `<select name="${selectName}" id="${selectId}">\n${optionsHtml}</select>`;
     }
-    function text_for_dserecord(dseRecord, exemplarId, textCorpusString) {
-        if (!(dseRecord instanceof HMTLib.DSERecord) || typeof dseRecord.passage !== 'string') {
-            console.error("text_for_dserecord: Invalid dseRecord input."); return "";
-        }
-        // This function will now call the generalized text_for_hmturn
-        return HMTLib.text_for_hmturn(dseRecord.passage, exemplarId, textCorpusString);
-    }
 
-    // --- NEW text_for_hmturn FUNCTION ---
+    // --- NEW text_for_dserecord FUNCTION ---
     /**
-     * Retrieves text content from a corpus string based on a text identifier string and an exemplar ID.
-     * Modifies the text identifier URN with the exemplar ID, then searches a corpus
+     * Retrieves text content from a corpus string based on a DSERecord and an exemplar ID.
+     * Modifies the DSERecord's passage URN with the exemplar ID, then searches a corpus
      * for matching text(s). Handles scholia by looking for .lemma and .comment versions.
      *
-     * @param {string} textIdentifierString - The base CTS URN of the text.
+     * @param {HMTLib.DSERecord} dseRecord - The DSE record containing the base passage URN.
      * @param {string} exemplarId - The exemplar identifier (e.g., "normalized", "diplomatic").
      * @param {string} textCorpusString - A pipe-delimited string where each line is "URN|Text Content".
      * @returns {string} The found text content, or concatenated texts (for scholia lemma/comment)
      *                   separated by double newlines. Returns an empty string if no text is found
      *                   or if inputs are invalid.
      */
-    function text_for_hmturn(textIdentifierString, exemplarId, textCorpusString) {
-        if (typeof textIdentifierString !== 'string' || textIdentifierString.trim() === "") {
-            console.error("text_for_hmturn: Invalid or empty textIdentifierString input.");
+    function text_for_dserecord(dseRecord, exemplarId, textCorpusString) {
+        if (!(dseRecord instanceof HMTLib.DSERecord) || typeof dseRecord.passage !== 'string') {
+            console.error("text_for_dserecord: Invalid dseRecord input.");
             return "";
         }
         if (!exemplarId || typeof exemplarId !== 'string' || exemplarId.trim() === "") {
-            console.error("text_for_hmturn: Invalid or empty exemplarId input.");
+            console.error("text_for_dserecord: Invalid or empty exemplarId input.");
             return "";
         }
         if (typeof textCorpusString !== 'string') {
-            console.error("text_for_hmturn: Invalid textCorpusString input.");
+            console.error("text_for_dserecord: Invalid textCorpusString input.");
             return "";
         }
 
-        const basePassageUrn = textIdentifierString;
+        const basePassageUrn = dseRecord.passage;
         const urnParts = basePassageUrn.split(':');
 
         if (urnParts.length !== 5) {
-            console.error(`text_for_hmturn: Malformed basePassageUrn "${basePassageUrn}". Expected 5 colon-separated parts.`);
+            console.error(`text_for_dserecord: Malformed basePassageUrn "${basePassageUrn}". Expected 5 colon-separated parts.`);
             return "";
         }
 
@@ -328,6 +322,8 @@
         const searchUrns = [];
         const scholionPrefix = "urn:cts:greekLit:tlg5026"; 
         
+        // Check the modified URN (which now includes the exemplar in its work ID part)
+        // for the scholion prefix.
         if (modifiedUrn.startsWith(scholionPrefix)) {
             searchUrns.push(modifiedUrn + ".lemma");
             searchUrns.push(modifiedUrn + ".comment");
@@ -340,20 +336,25 @@
 
         for (const line of corpusLines) {
             const trimmedLine = line.trim();
-            if (!trimmedLine) continue; 
+            if (!trimmedLine) continue; // Skip empty lines
 
             const lineParts = trimmedLine.split('|');
-            if (lineParts.length < 2) { 
+            if (lineParts.length < 2) { // Expect at least "URN|Text Content"
+                // console.warn(`text_for_dserecord: Skipping malformed corpus line: "${trimmedLine}"`);
                 continue;
             }
 
             const corpusUrn = lineParts[0].trim();
+            // Text content is the rest of the line after the first pipe
             const corpusText = lineParts.slice(1).join('|').trim(); 
 
             if (searchUrns.includes(corpusUrn)) {
                 foundTexts.push(corpusText);
             }
         }
+
+        // Join multiple found texts (e.g., lemma + comment for a scholion)
+        // with double newlines for better separation if displayed.
         return foundTexts.join("\n\n");
     }
 
@@ -378,7 +379,6 @@
     window.HMTLib.textlabel = textlabel;
     window.HMTLib.codexlist = codexlist; 
     window.HMTLib.codexmenu = codexmenu;
-    window.HMTLib.text_for_dserecord = text_for_dserecord;
-    window.HMTLib.text_for_hmturn = text_for_hmturn; // New function
+    window.HMTLib.text_for_dserecord = text_for_dserecord; // New function
 
 })(window);
