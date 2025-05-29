@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HMTLib iliadlines Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #controlPanel { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f0f0f0;}
+        .menu-group { margin-bottom: 15px; }
+        #selectionDisplay, #booksDisplayInfo, #linesDisplayInfo { margin-top: 10px; padding: 10px; border: 1px solid #ddd; background-color: #e9e9e9;}
+        .info { color: blue; }
+        .error { color: red; font-weight: bold; }
+        #loadingStatus { margin-top: 20px; }
+        select { margin-bottom: 5px; }
+    </style>
+    <!-- Using CDN links for dependencies -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <script src="hmt-lib.js"></script> <!-- Your HMTLib with the new functions -->
+</head>
+<body>
+    <h1>HMTLib <code>iliadlines</code> Function Test</h1>
+    
+    <div id="controlPanel">
+        <div class="menu-group">
+            <h2>1. Select an Iliad Version:</h2>
+            <div id="iliadVersionMenuContainer">
+                <p class="info">Loading Iliad versions menu...</p>
+            </div>
+            <div id="selectionDisplay">
+                <p>No Iliad version selected yet.</p>
+            </div>
+        </div>
+
+        <div class="menu-group">
+            <h2>2. Select a Book:</h2>
+            <div id="iliadBookMenuContainer">
+                <p class="info">Select an Iliad version first.</p>
+            </div>
+            <div id="booksDisplayInfo">
+                <p>No book selected yet.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="linesDisplayInfo">
+        <h3>Lines Found:</h3>
+        <p>Select an Iliad version and book to see the number of lines.</p>
+    </div>
+
+    <div id="loadingStatus">
+         <p class="info">Loading HMT data... This may take a moment.</p>
+    </div>
+
+    <script>
+        const iliadVersionMenuContainerDiv = document.getElementById('iliadVersionMenuContainer');
+        const selectionDisplayDiv = document.getElementById('selectionDisplay');
+        
+        const iliadBookMenuContainerDiv = document.getElementById('iliadBookMenuContainer');
+        const booksDisplayInfoDiv = document.getElementById('booksDisplayInfo');
+
+        const linesDisplayInfoDiv = document.getElementById('linesDisplayInfo');
+        const loadingStatusDiv = document.getElementById('loadingStatus');
+
+        let hmtParserInstance = null;
+        let diplomaticCorpus = null; 
+        let currentSelectedIliadUrn = null;
+        let currentSelectedBook = null;
+
+        function updateIliadVersionSelection(selectElement) {
+            currentSelectedIliadUrn = selectElement.value;
+            const selectedOption = selectElement.options[selectElement.selectedIndex];
+            const selectedText = selectedOption ? selectedOption.text : "N/A";
+
+            if (currentSelectedIliadUrn) {
+                selectionDisplayDiv.innerHTML = `<p><strong>Selected Iliad URN:</strong> <code>${currentSelectedIliadUrn}</code></p>
+                                                 <p><strong>Display Label:</strong> ${selectedText}</p>`;
+                populateBookMenu(currentSelectedIliadUrn);
+            } else {
+                selectionDisplayDiv.innerHTML = `<p>No Iliad version selected yet.</p>`;
+                iliadBookMenuContainerDiv.innerHTML = '<p class="info">Select an Iliad version first.</p>';
+                booksDisplayInfoDiv.innerHTML = '<p>No book selected yet.</p>';
+                linesDisplayInfoDiv.querySelector('h3').textContent = "Lines Found:";
+                linesDisplayInfoDiv.querySelector('p').textContent = 'Select an Iliad version and book.';
+                currentSelectedBook = null;
+            }
+            // Clear subsequent selections if Iliad version changes
+            if (!currentSelectedIliadUrn) {
+                 iliadBookMenuContainerDiv.innerHTML = '<p class="info">Select an Iliad version first.</p>';
+            }
+            updateLinesDisplay(); 
+        }
+
+        function populateBookMenu(iliadUrn) {
+            if (!hmtParserInstance || !diplomaticCorpus) {
+                iliadBookMenuContainerDiv.innerHTML = '<p class="error">Required data not loaded (Parser or Diplomatic Corpus).</p>';
+                return;
+            }
+            
+            loadingStatusDiv.innerHTML = `<p class="info">Fetching books for ${iliadUrn}...</p>`;
+            iliadBookMenuContainerDiv.innerHTML = '<p class="info">Loading books...</p>';
+
+            try {
+                const books = HMTLib.iliadbooks(iliadUrn, diplomaticCorpus);
+                if (books.length > 0) {
+                    let bookMenuHtml = '<select id="iliad_book_select_id" name="iliadBookSelector"><option value="">-- Select a Book --</option>';
+                    books.forEach(book => {
+                        bookMenuHtml += `<option value="${book}">Book ${book}</option>`;
+                    });
+                    bookMenuHtml += '</select>';
+                    iliadBookMenuContainerDiv.innerHTML = bookMenuHtml;
+
+                    const bookSelectElement = document.getElementById('iliad_book_select_id');
+                    bookSelectElement.addEventListener('change', function() {
+                        updateBookSelection(this);
+                    });
+                    updateBookSelection(bookSelectElement); // Initial update for book display
+                } else {
+                    iliadBookMenuContainerDiv.innerHTML = '<p>No books found for this version in the diplomatic corpus.</p>';
+                    booksDisplayInfoDiv.innerHTML = '<p>No books available.</p>';
+                }
+                loadingStatusDiv.innerHTML = `<p class="info">Book menu populated for ${iliadUrn}.</p>`;
+            } catch (e) {
+                console.error("Error populating book menu:", e);
+                iliadBookMenuContainerDiv.innerHTML = `<p class="error">Error fetching books: ${e.message}</p>`;
+                loadingStatusDiv.innerHTML = `<p class="error">Error fetching books for ${iliadUrn}.</p>`;
+            }
+        }
+        
+        function updateBookSelection(selectElement) {
+            currentSelectedBook = selectElement.value;
+             if (currentSelectedBook) {
+                booksDisplayInfoDiv.innerHTML = `<p><strong>Selected Book:</strong> ${currentSelectedBook}</p>`;
+            } else {
+                booksDisplayInfoDiv.innerHTML = '<p>No book selected yet.</p>';
+            }
+            updateLinesDisplay();
+        }
+
+        function updateLinesDisplay() {
+            if (currentSelectedIliadUrn && currentSelectedBook) {
+                // Construct the iliadBookUrn for iliadlines: base Iliad URN (without trailing :) + selected book
+                // Example: urn:cts:greekLit:tlg0012.tlg001.msA: (from menu) -> urn:cts:greekLit:tlg0012.tlg001.msA
+                // Then append : + book, e.g., urn:cts:greekLit:tlg0012.tlg001.msA:1
+                const baseIliadUrnForLines = currentSelectedIliadUrn.slice(0, -1); // Remove trailing colon
+                const fullBookUrnForSearch = `${baseIliadUrnForLines}:${currentSelectedBook}`;
+
+                linesDisplayInfoDiv.querySelector('h3').textContent = `Lines for: ${fullBookUrnForSearch}`;
+                linesDisplayInfoDiv.querySelector('p').textContent = 'Fetching lines...';
+
+                if (!diplomaticCorpus) {
+                     linesDisplayInfoDiv.querySelector('p').textContent = 'Diplomatic corpus not loaded.';
+                     return;
+                }
+
+                try {
+                    const lines = HMTLib.iliadlines(fullBookUrnForSearch, diplomaticCorpus);
+                    linesDisplayInfoDiv.querySelector('p').textContent = `Found ${lines.length} line(s) matching ${fullBookUrnForSearch}.`;
+                    // Optionally, display the list of lines if needed for debugging or more detail
+                    // console.log("Matching lines:", lines); 
+                } catch (e) {
+                    console.error("Error in HMTLib.iliadlines:", e);
+                    linesDisplayInfoDiv.querySelector('p').textContent = `Error fetching lines: ${e.message}`;
+                }
+            } else {
+                linesDisplayInfoDiv.querySelector('h3').textContent = "Lines Found:";
+                linesDisplayInfoDiv.querySelector('p').textContent = 'Select an Iliad version and book to see the number of lines.';
+            }
+        }
+
+
+        async function initializePage() {
+            if (typeof CEXParser === 'undefined' || 
+                typeof URNTools === 'undefined' || 
+                typeof HMTLib === 'undefined' || 
+                typeof HMTLib.iliadsmenu !== 'function' ||
+                typeof HMTLib.iliadbooks !== 'function' ||
+                typeof HMTLib.iliadlines !== 'function' ||
+                typeof HMTLib.hmtdiplomatic !== 'function') {
+                loadingStatusDiv.innerHTML = "<p class='error'>Error: Essential libraries or HMTLib functions are not loaded. Testing cannot proceed.</p>";
+                iliadVersionMenuContainerDiv.innerHTML = "<p class='error'>Cannot load Iliad version menu.</p>";
+                return;
+            }
+
+            try {
+                hmtParserInstance = await HMTLib.hmtcurrent();
+                loadingStatusDiv.innerHTML = "<p class='info'>HMT data loaded.</p>";
+                
+                loadingStatusDiv.innerHTML = '<p class="info">Pre-loading diplomatic text corpus...</p>';
+                try {
+                    diplomaticCorpus = HMTLib.hmtdiplomatic(hmtParserInstance);
+                    loadingStatusDiv.innerHTML = '<p class="info">Diplomatic corpus pre-loaded.</p>';
+                } catch (e) {
+                    console.error("Error pre-loading diplomatic corpus:", e);
+                    loadingStatusDiv.innerHTML = `<p class="error">Error pre-loading diplomatic corpus: ${e.message}. Line fetching might fail.</p>`;
+                }
+
+                const menuName = "iliadVersionSelector";
+                const menuId = "iliad_version_select_id";
+                const menuHtml = HMTLib.iliadsmenu(hmtParserInstance, menuName, menuId);
+                
+                iliadVersionMenuContainerDiv.innerHTML = menuHtml;
+                loadingStatusDiv.innerHTML += "<p class='info'>Iliads menu generated. Select an Iliad version.</p>";
+
+                const iliadVersionSelectElement = document.getElementById(menuId);
+                if (iliadVersionSelectElement) {
+                    iliadVersionSelectElement.addEventListener('change', function() {
+                        updateIliadVersionSelection(this);
+                    });
+                    updateIliadVersionSelection(iliadVersionSelectElement); // Initial call
+                } else {
+                    loadingStatusDiv.innerHTML += "<p class='error'>Could not find the generated Iliad version select menu by ID.</p>";
+                }
+
+            } catch (error) {
+                console.error("Error during initialization:", error);
+                loadingStatusDiv.innerHTML = `<p class="error">Failed to initialize: ${error.message}.</p>`;
+                iliadVersionMenuContainerDiv.innerHTML = "<p class='error'>Cannot load menu due to initialization error.</p>";
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initializePage);
+    </script>
+</body>

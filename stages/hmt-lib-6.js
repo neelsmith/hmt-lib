@@ -1,266 +1,607 @@
 // hmt-lib.js
 (function(window) {
-    'use strict';
+'use strict';
 
-    // Create a namespace for the library if it doesn't exist
-    if (typeof window.HMTLib === 'undefined') {
-        window.HMTLib = {};
+if (typeof window.HMTLib === 'undefined') {
+window.HMTLib = {};
     }
 
-    /**
-     * Represents a DSE (Document-Surface-Element) record.
-     */
-    class DSERecord {
-        /**
-         * Creates an instance of DSERecord.
-         * @param {string} passage - The passage identifier (CTS URN).
-         * @param {string} imageroi - The image ROI (Region of Interest) identifier (CITE2 URN with optional ROI).
-         * @param {string} surface - The surface identifier (CITE2 URN, often a page).
-         */
-        constructor(passage, imageroi, surface) {
-            this.passage = passage;
-            this.imageroi = imageroi;
-            this.surface = surface; // This property is matched against 'page' URNs
+// --- CLASSES ---
+class DSERecord {
+constructor(passage, imageroi, surface) {
+this.passage = passage;
+this.imageroi = imageroi;
+this.surface = surface;
         }
     }
 
-    /**
-     * Loads the HMT current CEX data source from a predefined URL.
-     * @returns {Promise<CEXParser>} A Promise that resolves with the CEXParser instance.
-     */
-    function hmtcurrent() {
-        const hmtCurrentCexUrl = "https://raw.githubusercontent.com/homermultitext/hmt-archive/refs/heads/master/releases-cex/hmt-current.cex";
-
-        if (typeof CEXParser === 'undefined') {
-            console.error("CEXParser is not defined. Ensure cex-lib.js is loaded before hmt-lib.js.");
-            return Promise.reject(new Error("CEXParser is not defined. Ensure cex-lib.js is loaded."));
+class Scholion {
+constructor(scholionUrn, iliadUrn) {
+this.scholion = scholionUrn;
+this.iliad = iliadUrn;
         }
-
-        const parser = new CEXParser();
-        return parser.loadFromUrl(hmtCurrentCexUrl);
     }
 
-    /**
-     * Filters records from 'ctsdata' blocks where the CTS URN's work component
-     * ends with '.normalized'.
-     * @param {CEXParser} parserInstance - The CEXParser instance.
-     * @returns {string[]} An array of matching delimited-text lines.
-     */
-    function hmtnormalized(parserInstance) {
-        if (typeof URNTools === 'undefined') {
-            console.error("URNTools is not defined. Ensure urn-lib.js is loaded.");
-            return [];
+class CodexPage {
+constructor(sequence, image, urn, rv, label) {
+this.sequence = parseFloat(sequence); // Ensure sequence is numeric
+this.image = image;
+this.urn = urn;
+this.rv = rv;
+this.label = label;
         }
-        if (!(parserInstance instanceof CEXParser)) {
-            console.error("Invalid parserInstance provided to hmtnormalized.");
-            return [];
+    }
+
+// --- CORE HMT FUNCTIONS ---
+function hmtcurrent() {
+const hmtCurrentCexUrl = "https://raw.githubusercontent.com/homermultitext/hmt-archive/refs/heads/master/releases-cex/hmt-current.cex";
+if (typeof CEXParser === 'undefined') {
+console.error("hmtcurrent: CEXParser is not defined. Ensure cex-lib.js is loaded.");
+return Promise.reject(new Error("CEXParser is not defined."));
         }
+const parser = new CEXParser();
+return parser.loadFromUrl(hmtCurrentCexUrl);
+    }
 
-        const filteredRecords = [];
-        const ctsDataBlockContents = parserInstance.getBlockContents('ctsdata');
+function hmtnormalized(parserInstance) {
+if (typeof URNTools === 'undefined') { console.error("hmtnormalized: URNTools not defined. Functions relying on it may not work as expected."); }
+if (!(parserInstance instanceof CEXParser)) { console.error("hmtnormalized: Invalid parserInstance."); return []; }
+const filteredRecords = [];
+const ctsDataBlockContents = parserInstance.getBlockContents('ctsdata');
+ctsDataBlockContents.forEach(blockContent => {
+const lines = blockContent.split('\n');
+lines.forEach(line => {
+const trimmedLine = line.trim();
+if (trimmedLine === '' || trimmedLine.startsWith('//')) return;
+const parts = trimmedLine.split('|');
+if (parts.length >= 1) {
+const urnString = parts[0];
+let workComponent = '';
+if (typeof URNTools !== 'undefined' && typeof URNTools.workcomponent === 'function') {
+    workComponent = URNTools.workcomponent(urnString);
+} else if (urnString.includes('.normalized')) {
+    workComponent = '.normalized'; 
+}
 
-        ctsDataBlockContents.forEach(blockContent => {
-            const lines = blockContent.split('\n');
-            lines.forEach(line => {
-                const trimmedLine = line.trim();
-                if (trimmedLine === '' || trimmedLine.startsWith('//')) return;
-
-                const parts = trimmedLine.split('|');
-                if (parts.length >= 1) {
-                    const urnString = parts[0];
-                    const workComponent = URNTools.workcomponent(urnString);
-                    if (workComponent && workComponent.endsWith('.normalized')) {
+if (workComponent && workComponent.endsWith('.normalized')) {
+filteredRecords.push(trimmedLine);
+                    } else if (!workComponent && urnString.includes('.normalized')) {
                         filteredRecords.push(trimmedLine);
                     }
                 }
             });
         });
-        return filteredRecords;
+return filteredRecords;
     }
 
-    /**
-     * Filters records from 'ctsdata' blocks where the CTS URN's work component
-     * ends with '.diplomatic'.
-     * @param {CEXParser} parserInstance - The CEXParser instance.
-     * @returns {string[]} An array of matching delimited-text lines.
-     */
-    function hmtdiplomatic(parserInstance) {
-        if (typeof URNTools === 'undefined') {
-            console.error("URNTools is not defined. Ensure urn-lib.js is loaded.");
-            return [];
-        }
-        if (!(parserInstance instanceof CEXParser)) {
-            console.error("Invalid parserInstance provided to hmtdiplomatic.");
-            return [];
-        }
-
-        const filteredRecords = [];
-        const ctsDataBlockContents = parserInstance.getBlockContents('ctsdata');
-
-        ctsDataBlockContents.forEach(blockContent => {
-            const lines = blockContent.split('\n');
-            lines.forEach(line => {
-                const trimmedLine = line.trim();
-                if (trimmedLine === '' || trimmedLine.startsWith('//')) return;
-
-                const parts = trimmedLine.split('|');
-                if (parts.length >= 1) {
-                    const urnString = parts[0];
-                    const workComponent = URNTools.workcomponent(urnString);
-                    if (workComponent && workComponent.endsWith('.diplomatic')) {
+function hmtdiplomatic(parserInstance) {
+if (typeof URNTools === 'undefined') { console.error("hmtdiplomatic: URNTools not defined. Functions relying on it may not work as expected."); }
+if (!(parserInstance instanceof CEXParser)) { console.error("hmtdiplomatic: Invalid parserInstance."); return []; }
+const filteredRecords = [];
+const ctsDataBlockContents = parserInstance.getBlockContents('ctsdata');
+ctsDataBlockContents.forEach(blockContent => {
+const lines = blockContent.split('\n');
+lines.forEach(line => {
+const trimmedLine = line.trim();
+if (trimmedLine === '' || trimmedLine.startsWith('//')) return;
+const parts = trimmedLine.split('|');
+if (parts.length >= 1) {
+const urnString = parts[0];
+let workComponent = '';
+if (typeof URNTools !== 'undefined' && typeof URNTools.workcomponent === 'function') {
+    workComponent = URNTools.workcomponent(urnString);
+} else if (urnString.includes('.diplomatic')) {
+    workComponent = '.diplomatic';
+}
+if (workComponent && workComponent.endsWith('.diplomatic')) {
+filteredRecords.push(trimmedLine);
+                    } else if (!workComponent && urnString.includes('.diplomatic')) {
                         filteredRecords.push(trimmedLine);
                     }
                 }
             });
         });
-        return filteredRecords;
+return filteredRecords;
     }
 
-    /**
-     * Extracts DSE (Document-Surface-Element) records from 'citerelationset' blocks
-     * specifically from 'urn:cite2:hmt:hmtdse.v1:all'.
-     * @param {CEXParser} parserInstance - The CEXParser instance.
-     * @returns {DSERecord[]} An array of DSERecord objects.
-     */
-    function hmtdse(parserInstance) {
-        const dseRecords = [];
-        const targetRelationSetUrn = "urn:cite2:hmt:hmtdse.v1:all";
-        const expectedHeader = "passage|imageroi|surface";
-
-        if (!(parserInstance instanceof CEXParser)) {
-            console.error("Invalid parserInstance provided to hmtdse.");
-            return [];
-        }
-
-        const citeRelationSetBlockContents = parserInstance.getBlockContents("citerelationset");
-
-        for (const blockContent of citeRelationSetBlockContents) {
-            const lines = blockContent.split('\n');
-            const processedLines = []; 
-
-            for (const line of lines) {
-                const trimmedLine = line.trim();
-                if (trimmedLine !== '' && !trimmedLine.startsWith('//')) {
-                    processedLines.push(trimmedLine);
-                }
+function hmtdse(parserInstance) {
+const dseRecords = [];
+const targetRelationSetUrn = "urn:cite2:hmt:hmtdse.v1:all";
+const expectedHeader = "passage|imageroi|surface";
+if (!(parserInstance instanceof CEXParser)) { console.error("hmtdse: Invalid parserInstance."); return []; }
+const citeRelationSetBlockContents = parserInstance.getBlockContents("citerelationset");
+for (const blockContent of citeRelationSetBlockContents) {
+const lines = blockContent.split('\n');
+const processedLines = [];
+for (const line of lines) {
+const trimmedLine = line.trim();
+if (trimmedLine !== '' && !trimmedLine.startsWith('//')) processedLines.push(trimmedLine);
             }
-
-            if (processedLines.length < 3) { // Need at least URN, label, header
-                continue;
-            }
-
-            let currentBlockUrn = null;
-            if (processedLines[0].startsWith("urn|")) {
-                currentBlockUrn = processedLines[0].substring("urn|".length);
-            } else {
-                continue;
-            }
-
-            // Optional: Check label line, though not strictly necessary for this function's logic
-            // if (!processedLines[1].startsWith("label|")) continue;
-
-
-            if (currentBlockUrn === targetRelationSetUrn) {
-                const headerLine = processedLines[2]; // Header is the 3rd processed line
-                if (headerLine !== expectedHeader) {
-                    console.warn(`Skipping DSE block ${currentBlockUrn}: Header mismatch. Expected "${expectedHeader}", found "${headerLine}".`);
-                    continue;
-                }
-
-                for (let i = 3; i < processedLines.length; i++) { // Data starts from 4th processed line
-                    const dataLine = processedLines[i];
-                    const columns = dataLine.split('|');
-
-                    if (columns.length === 3) { // passage, imageroi, surface
-                        const record = new DSERecord(columns[0], columns[1], columns[2]);
-                        dseRecords.push(record);
+if (processedLines.length < 3) continue;
+let currentBlockUrn = processedLines[0].startsWith("urn|") ? processedLines[0].substring("urn|".length) : null;
+if (!currentBlockUrn) continue;
+if (currentBlockUrn === targetRelationSetUrn) {
+const headerLine = processedLines[2];
+if (headerLine !== expectedHeader) { console.warn(`hmtdse: Header mismatch in ${currentBlockUrn}. Expected "${expectedHeader}", found "${headerLine}".`); continue; }
+for (let i = 3; i < processedLines.length; i++) {
+const columns = processedLines[i].split('|');
+if (columns.length === 3) {
+dseRecords.push(new HMTLib.DSERecord(columns[0], columns[1], columns[2]));
                     } else {
-                        console.warn(`Skipping data row in DSE block ${currentBlockUrn}: Incorrect number of columns. Expected 3, found ${columns.length}. Row: "${dataLine}"`);
+console.warn(`hmtdse: Incorrect column count in ${currentBlockUrn}, row: "${processedLines[i]}"`);
                     }
                 }
             }
         }
-        return dseRecords;
+return dseRecords;
     }
 
-    // --- NEW DSE Record Query FUNCTIONS ---
-
-    /**
-     * Finds all DSERecords where the 'surface' property matches the given page URN.
-     *
-     * @param {string} pageUrn - The CITE2 URN of the page to search for.
-     * @param {HMTLib.DSERecord[]} dseRecordsArray - An array of DSERecord objects.
-     * @returns {HMTLib.DSERecord[]} An array of matching DSERecord objects (possibly empty).
-     */
-    function recordsforpage(pageUrn, dseRecordsArray) {
-        if (!pageUrn || typeof pageUrn !== 'string' || !Array.isArray(dseRecordsArray)) {
-            console.error("recordsforpage: Invalid input. pageUrn must be a non-empty string and dseRecordsArray an array.");
-            return [];
-        }
-        return dseRecordsArray.filter(record => record instanceof DSERecord && record.surface === pageUrn);
+function recordsforpage(pageUrn, dseRecordsArray) {
+if (!pageUrn || typeof pageUrn !== 'string' || !Array.isArray(dseRecordsArray)) { console.error("recordsforpage: Invalid input."); return []; }
+return dseRecordsArray.filter(r => r instanceof HMTLib.DSERecord && r.surface === pageUrn);
     }
 
-    /**
-     * Finds the first DSERecord where the 'passage' property matches the given CTS URN.
-     *
-     * @param {string} passageUrn - The CTS URN of the passage to search for.
-     * @param {HMTLib.DSERecord[]} dseRecordsArray - An array of DSERecord objects.
-     * @returns {HMTLib.DSERecord | null} The matching DSERecord object, or null if not found.
-     */
-    function recordforpassage(passageUrn, dseRecordsArray) {
-        if (!passageUrn || typeof passageUrn !== 'string' || !Array.isArray(dseRecordsArray)) {
-            console.error("recordforpassage: Invalid input. passageUrn must be a non-empty string and dseRecordsArray an array.");
-            return null;
-        }
-        return dseRecordsArray.find(record => record instanceof DSERecord && record.passage === passageUrn) || null;
+function recordforpassage(passageUrn, dseRecordsArray) {
+if (!passageUrn || typeof passageUrn !== 'string' || !Array.isArray(dseRecordsArray)) { console.error("recordforpassage: Invalid input."); return null; }
+return dseRecordsArray.find(r => r instanceof HMTLib.DSERecord && r.passage === passageUrn) || null;
     }
 
-    /**
-     * Finds the image URN for a given page URN from an array of DSERecords.
-     * It first finds records for the page using `recordsforpage`, then extracts 
-     * and processes the imageroi property of the first matching record by 
-     * removing the ROI suffix (part after the last '@').
-     *
-     * @param {string} pageUrn - The CITE2 URN identifying the page.
-     * @param {HMTLib.DSERecord[]} dseRecordsArray - An array of DSERecord objects.
-     * @returns {string | null} The image URN (without ROI), or null if no matching record
-     *                          is found or if the imageroi property is missing/invalid.
-     */
-    function imageforpage(pageUrn, dseRecordsArray) {
-        if (!pageUrn || typeof pageUrn !== 'string' || !Array.isArray(dseRecordsArray)) {
-            console.error("imageforpage: Invalid input. pageUrn must be a non-empty string and dseRecordsArray an array.");
-            return null;
+function imageforpage(pageUrn, dseRecordsArray) {
+if (!pageUrn || typeof pageUrn !== 'string' || !Array.isArray(dseRecordsArray)) { console.error("imageforpage: Invalid input."); return null; }
+const recs = HMTLib.recordsforpage(pageUrn, dseRecordsArray);
+if (recs.length > 0 && recs[0].imageroi && typeof recs[0].imageroi === 'string') {
+const idx = recs[0].imageroi.lastIndexOf('@');
+return idx !== -1 ? recs[0].imageroi.substring(0, idx) : recs[0].imageroi;
         }
+return null;
+    }
 
-        const matchingPageRecords = recordsforpage(pageUrn, dseRecordsArray);
-
-        if (matchingPageRecords.length > 0) {
-            const firstRecord = matchingPageRecords[0];
-            if (firstRecord && firstRecord.imageroi && typeof firstRecord.imageroi === 'string') {
-                const imageroi = firstRecord.imageroi;
-                const roiSeparatorIndex = imageroi.lastIndexOf('@');
-                
-                if (roiSeparatorIndex !== -1) {
-                    return imageroi.substring(0, roiSeparatorIndex);
+function hmtscholia(parserInstance) {
+const scholiaRecords = [];
+const targetUrn = "urn:cite2:hmt:commentary.v1:all";
+const expectedHeader = "scholion|iliad";
+if (!(parserInstance instanceof CEXParser)) { console.error("hmtscholia: Invalid parserInstance."); return []; }
+const blocks = parserInstance.getBlockContents("citerelationset");
+for (const blockContent of blocks) {
+const lines = blockContent.split('\n');
+const processed = [];
+for (const line of lines) {
+const trimmed = line.trim();
+if (trimmed !== '' && !trimmed.startsWith('//')) processed.push(trimmed);
+            }
+if (processed.length < 3) continue;
+let blockUrn = processed[0].startsWith("urn|") ? processed[0].substring("urn|".length) : null;
+if (!blockUrn) continue;
+if (blockUrn === targetUrn) {
+if (processed[2] !== expectedHeader) { console.warn(`hmtscholia: Header mismatch in ${blockUrn}. Expected "${expectedHeader}", found "${processed[2]}".`); continue; }
+for (let i = 3; i < processed.length; i++) {
+const cols = processed[i].split('|');
+if (cols.length === 2) {
+scholiaRecords.push(new HMTLib.Scholion(cols[0], cols[1]));
+                    } else {
+console.warn(`hmtscholia: Incorrect column count in ${blockUrn}, row: "${processed[i]}"`);
+                    }
                 }
-                // If no '@' is found, the entire string is considered the image identifier.
-                return imageroi; 
-            } else {
-                // console.warn(`imageforpage: First record for page ${pageUrn} has missing, null, or invalid imageroi property.`);
-                return null; 
             }
         }
-        return null; // No records found for the page
+return scholiaRecords;
     }
 
-    // Expose functions and class via the HMTLib namespace
-    window.HMTLib.DSERecord = DSERecord;
-    window.HMTLib.hmtcurrent = hmtcurrent;
-    window.HMTLib.hmtnormalized = hmtnormalized;
-    window.HMTLib.hmtdiplomatic = hmtdiplomatic;
-    window.HMTLib.hmtdse = hmtdse;
-    window.HMTLib.recordsforpage = recordsforpage;
-    window.HMTLib.recordforpassage = recordforpassage;
-    window.HMTLib.imageforpage = imageforpage;
+function passageforscholion(scholionUrn, scholiaArray) {
+if (!scholionUrn || typeof scholionUrn !== 'string' || !Array.isArray(scholiaArray)) { console.error("passageforscholion: Invalid input."); return null; }
+const found = scholiaArray.find(s => s instanceof HMTLib.Scholion && s.scholion === scholionUrn);
+return found ? found.iliad : null;
+    }
+
+function scholiaforpassage(iliadUrn, scholiaArray) {
+if (!iliadUrn || typeof iliadUrn !== 'string' || !Array.isArray(scholiaArray)) { console.error("scholiaforpassage: Invalid input."); return []; }
+return scholiaArray.filter(s => s instanceof HMTLib.Scholion && s.iliad === iliadUrn).map(s => s.scholion);
+    }
+
+function codex(parserInstance, codexUrnPrefix) {
+const codexPagesResult = [];
+const requiredColumns = ['urn', 'sequence', 'image', 'rv', 'label'];
+if (!(parserInstance instanceof CEXParser)) { console.error("codex: Invalid parserInstance provided."); return []; }
+if (typeof codexUrnPrefix !== 'string' || !codexUrnPrefix.endsWith(':')) { console.error("codex: codexUrnPrefix must be a string ending with a colon."); return []; }
+if (typeof URNTools === 'undefined') { console.error("codex: URNTools is not defined. Functions relying on it may not work as expected."); }
+
+const citeDataBlocks = parserInstance.getBlockContents("citedata");
+for (const blockContent of citeDataBlocks) {
+const lines = blockContent.split('\n');
+let headerLine = null, dataLinesStartIdx = -1;
+const columnIndexMap = {};
+for (let i = 0; i < lines.length; i++) {
+const trimmedLine = lines[i].trim();
+if (trimmedLine === '' || trimmedLine.startsWith('//')) continue;
+if (!headerLine) {
+headerLine = trimmedLine;
+headerLine.split('|').forEach((name, idx) => { columnIndexMap[name.trim()] = idx; });
+dataLinesStartIdx = i + 1;
+break;
+                }
+            }
+if (!headerLine) continue;
+let missingColumn = false;
+for (const colName of requiredColumns) {
+if (typeof columnIndexMap[colName] === 'undefined') { console.warn(`codex: Skipping citedata block - header missing '${colName}'. Header: "${headerLine}"`); missingColumn = true; break; }
+            }
+if (missingColumn) continue;
+for (let i = dataLinesStartIdx; i < lines.length; i++) {
+const trimmedLine = lines[i].trim();
+if (trimmedLine === '' || trimmedLine.startsWith('//')) continue;
+const columnValues = trimmedLine.split('|');
+let maxRequiredIndex = 0;
+for (const rc of requiredColumns) { if (columnIndexMap[rc] > maxRequiredIndex) maxRequiredIndex = columnIndexMap[rc]; }
+if (columnValues.length <= maxRequiredIndex) continue;
+
+const currentRowFullUrn = columnValues[columnIndexMap['urn']].trim();
+let isValidUrn = false;
+let rowNamespace = null;
+let rowCollection = null;
+
+if (typeof URNTools !== 'undefined' && typeof URNTools.isValidCite2Urn === 'function') {
+    isValidUrn = URNTools.isValidCite2Urn(currentRowFullUrn);
+} else {
+    isValidUrn = currentRowFullUrn.startsWith("urn:cite2:");
+}
+
+if (isValidUrn) {
+    if (typeof URNTools !== 'undefined' && typeof URNTools.cite2namespace === 'function' && typeof URNTools.collectioncomponent === 'function') {
+        rowNamespace = URNTools.cite2namespace(currentRowFullUrn);
+        rowCollection = URNTools.collectioncomponent(currentRowFullUrn);
+    } else {
+        const urnParts = currentRowFullUrn.split(':');
+        if (urnParts.length >= 4) {
+            rowNamespace = urnParts[2];
+            rowCollection = urnParts[3];
+        }
+    }
+}
+
+if (!isValidUrn || !rowNamespace || !rowCollection) continue;
+
+const currentRowPrefix = `urn:cite2:${rowNamespace}:${rowCollection}:`;
+if (currentRowPrefix === codexUrnPrefix) {
+try {
+const sequenceStr = columnValues[columnIndexMap['sequence']].trim();
+if (isNaN(parseFloat(sequenceStr))) continue;
+const image = columnValues[columnIndexMap['image']].trim();
+const rv = columnValues[columnIndexMap['rv']].trim();
+const label = columnValues[columnIndexMap['label']].trim();
+codexPagesResult.push(new HMTLib.CodexPage(sequenceStr, image, currentRowFullUrn, rv, label));
+                    } catch (e) { console.error(`codex: Error creating CodexPage for row "${trimmedLine}". Error: ${e.message}`); }
+                }
+            }
+        }
+return codexPagesResult;
+    }
+
+function collectionlabel(collectionCite2Urn, parserInstance) {
+if (!collectionCite2Urn || typeof collectionCite2Urn !== 'string') { console.error("collectionlabel: collectionCite2Urn invalid."); return null; }
+if (!(parserInstance instanceof CEXParser)) { console.error("collectionlabel: parserInstance invalid."); return null; }
+const dataString = parserInstance.getDelimitedData("citecollections");
+if (!dataString) return null;
+const lines = dataString.split('\n');
+if (lines.length < 1) return null;
+const headerParts = lines[0].split('|').map(h => h.trim());
+const urnIndex = headerParts.indexOf("URN");
+const descriptionIndex = headerParts.indexOf("Description");
+if (urnIndex === -1 || descriptionIndex === -1) { console.error("collectionlabel: 'URN' or 'Description' not in 'citecollections' header."); return null; }
+for (let i = 1; i < lines.length; i++) {
+const line = lines[i].trim();
+if (line === "") continue;
+const rowParts = line.split('|');
+if (rowParts.length > Math.max(urnIndex, descriptionIndex)) {
+if (rowParts[urnIndex].trim() === collectionCite2Urn) {
+return rowParts[descriptionIndex].trim();
+                }
+            }
+        }
+return null;
+    }
+
+function textlabel(textCtsUrnInput, parserInstance) {
+    if (!textCtsUrnInput || typeof textCtsUrnInput !== 'string') {
+        console.error("textlabel: textCtsUrnInput invalid or not a string.");
+        return null;
+    }
+    if (!(parserInstance instanceof CEXParser)) {
+        console.error("textlabel: parserInstance invalid.");
+        return null;
+    }
+
+    let searchUrnToUse;
+    const originalUrnParts = textCtsUrnInput.split(':');
+
+    if (originalUrnParts.length !== 5) {
+        searchUrnToUse = textCtsUrnInput;
+    } else { 
+        const workIdentifier = originalUrnParts[3];
+        const workSubparts = workIdentifier.split('.');
+        
+        let processedWorkIdentifier = workIdentifier;
+        if (workSubparts.length === 4) {
+            processedWorkIdentifier = workSubparts.slice(0, 3).join('.');
+        }
+        searchUrnToUse = `${originalUrnParts[0]}:${originalUrnParts[1]}:${originalUrnParts[2]}:${processedWorkIdentifier}:`;
+    }
+    
+    const dataString = parserInstance.getDelimitedData("ctscatalog");
+    if (!dataString) {
+        return null;
+    }
+
+    const lines = dataString.split('\n');
+    if (lines.length < 1) {
+        return null;
+    }
+
+    const headerParts = lines[0].split('|').map(h => h.trim());
+    const colIndices = {
+        urn: headerParts.indexOf("urn"),
+        groupName: headerParts.indexOf("groupName"),
+        workTitle: headerParts.indexOf("workTitle"),
+        versionLabel: headerParts.indexOf("versionLabel"),
+        exemplarLabel: headerParts.indexOf("exemplarLabel")
+    };
+
+    if (colIndices.urn === -1 || colIndices.groupName === -1 || colIndices.workTitle === -1 || colIndices.versionLabel === -1) {
+        console.error("textlabel: Required columns (urn, groupName, workTitle, versionLabel) not found in 'ctscatalog' header.");
+        return null;
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === "") continue;
+
+        const rowParts = line.split('|');
+        if (rowParts.length <= colIndices.urn) continue;
+
+        if (rowParts[colIndices.urn].trim() === searchUrnToUse) {
+            if (rowParts.length <= Math.max(colIndices.groupName, colIndices.workTitle, colIndices.versionLabel)) {
+                return null;
+            }
+
+            const group = rowParts[colIndices.groupName].trim();
+            const work = rowParts[colIndices.workTitle].trim();
+            const version = rowParts[colIndices.versionLabel].trim();
+            let exemplar = "";
+
+            if (colIndices.exemplarLabel !== -1 && rowParts.length > colIndices.exemplarLabel && rowParts[colIndices.exemplarLabel]) {
+                exemplar = rowParts[colIndices.exemplarLabel].trim();
+            }
+
+            let label = `${group}, ${work}`;
+            if (version) { 
+                label += ` (${version})`;
+            }
+            if (exemplar) { 
+                label += ` ${exemplar}`;
+            }
+            return label;
+        }
+    }
+    return null;
+}
+
+
+function codexlist(parserInstance) {
+if (!(parserInstance instanceof CEXParser)) { console.error("codexlist: Invalid parserInstance."); return []; }
+if (typeof parserInstance.getCollectionsForModel !== 'function') { console.error("codexlist: parserInstance.getCollectionsForModel is not a function."); return []; }
+const targetModelValue = "urn:cite2:hmt:datamodels.v1:codexmodel";
+try {
+return parserInstance.getCollectionsForModel(targetModelValue);
+        } catch (e) {
+console.error("codexlist: Error calling parserInstance.getCollectionsForModel:", e);
+return [];
+        }
+    }
+
+function codexmenu(parserInstance, selectName, selectId) {
+if (!(parserInstance instanceof CEXParser)) {
+console.error("codexmenu: Invalid parserInstance.");
+return `<select name="${selectName}" id="${selectId}"><option value="">Error: Invalid Parser</option></select>`;
+        }
+if (typeof HMTLib.codexlist !== 'function') {
+console.error("codexmenu: HMTLib.codexlist is not defined.");
+return `<select name="${selectName}" id="${selectId}"><option value="">Error: codexlist fn missing</option></select>`;
+        }
+if (typeof HMTLib.collectionlabel !== 'function') {
+console.error("codexmenu: HMTLib.collectionlabel is not defined.");
+return `<select name="${selectName}" id="${selectId}"><option value="">Error: collectionlabel fn missing</option></select>`;
+        }
+
+let optionsHtml = '';
+const codexUrns = HMTLib.codexlist(parserInstance);
+
+if (codexUrns.length === 0) {
+optionsHtml = '<option value="">No codices found</option>';
+        } else {
+codexUrns.forEach(urn => {
+const label = HMTLib.collectionlabel(urn, parserInstance);
+const displayLabel = label ? label : urn;
+const escapedUrn = urn.replace(/"/g, "&quot;");
+const escapedDisplayLabel = displayLabel.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+optionsHtml += `<option value="${escapedUrn}">${escapedDisplayLabel}</option>\n`;
+            });
+        }
+const selectHtml = `<select name="${selectName}" id="${selectId}">\n${optionsHtml}</select>`;
+return selectHtml;
+    }
+
+function text_for_hmturn(passageIdentifier, exemplar, corpusInput) {
+    if (typeof passageIdentifier !== 'string' || passageIdentifier.trim() === '') {
+        return "";
+    }
+    if (typeof exemplar !== 'string' || exemplar.trim() === '') {
+        console.error("text_for_hmturn: exemplar must be a non-empty string. Received:", exemplar);
+        return "";
+    }
+    
+    let corpusLines = [];
+    if (typeof corpusInput === 'string') {
+        corpusLines = corpusInput.split('\n');
+    } else if (Array.isArray(corpusInput)) {
+        corpusLines = corpusInput; 
+    } else {
+        console.error("text_for_hmturn: corpusInput must be a string or an array of strings. Received type:", typeof corpusInput);
+        return "";
+    }
+
+    const parts = passageIdentifier.split(':');
+    if (parts.length !== 5) {
+        console.warn(`text_for_hmturn: passageIdentifier was expected to have 5 colon-separated parts. Received: "${passageIdentifier}" which has ${parts.length} parts. Cannot reliably construct search URN.`);
+        return "";
+    }
+    
+    const workComponentOriginal = parts[3];
+    const modifiedWorkComponent = `${workComponentOriginal}.${exemplar}`;
+    
+    const baseSearchUrn = `${parts[0]}:${parts[1]}:${parts[2]}:${modifiedWorkComponent}:${parts[4]}`;
+
+    const SCHOLION_PREFIX = "urn:cts:greekLit:tlg5026";
+    const isScholion = baseSearchUrn.startsWith(SCHOLION_PREFIX);
+    
+    const searchUrns = [];
+    if (isScholion) {
+        searchUrns.push(`${baseSearchUrn}.lemma`);
+        searchUrns.push(`${baseSearchUrn}.comment`);
+    } else {
+        searchUrns.push(baseSearchUrn);
+    }
+    
+    const matchedLines = [];
+
+    for (const line of corpusLines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === '') continue;
+
+        const pipeIndex = trimmedLine.indexOf('|');
+        if (pipeIndex === -1) continue; 
+        
+        const currentUrnInCorpus = trimmedLine.substring(0, pipeIndex);
+        
+        if (searchUrns.includes(currentUrnInCorpus)) {
+            matchedLines.push(trimmedLine);
+        }
+    }
+    return matchedLines.join('\n');
+}
+
+function iliads(parserInstance) {
+    if (!(parserInstance instanceof CEXParser)) {
+        console.error("iliads: Invalid parserInstance provided.");
+        return [];
+    }
+
+    const iliadUrns = [];
+    const ILIAD_URN_PREFIX = "urn:cts:greekLit:tlg0012";
+    const catalogDataString = parserInstance.getDelimitedData("ctscatalog");
+
+    if (!catalogDataString) {
+        console.warn("iliads: No 'ctscatalog' data found in parserInstance.");
+        return [];
+    }
+
+    const lines = catalogDataString.split('\n');
+    if (lines.length < 1) { 
+        console.warn("iliads: 'ctscatalog' data is empty or malformed.");
+        return [];
+    }
+
+    const headerLine = lines[0].trim();
+    const headerParts = headerLine.split('|').map(h => h.trim());
+    const urnColumnIndex = headerParts.indexOf("urn");
+
+    if (urnColumnIndex === -1) {
+        console.error("iliads: 'urn' column not found in 'ctscatalog' header.");
+        return [];
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === "" || line.startsWith("//")) continue; 
+
+        const columns = line.split('|');
+        if (columns.length > urnColumnIndex) {
+            const currentUrn = columns[urnColumnIndex].trim();
+            if (currentUrn.startsWith(ILIAD_URN_PREFIX)) {
+                iliadUrns.push(currentUrn);
+            }
+        }
+    }
+    return iliadUrns;
+}
+
+// --- NEW iliadsmenu FUNCTION ---
+/**
+ * Builds an HTML select menu for choosing an Iliad version.
+ * Uses HMTLib.iliads to get URNs and HMTLib.textlabel for option text.
+ * @param {CEXParser} parserInstance - The CEXParser instance.
+ * @param {string} selectName - The 'name' attribute for the select element.
+ * @param {string} selectId - The 'id' attribute for the select element.
+ * @returns {string} An HTML string representing the <select> element.
+ */
+function iliadsmenu(parserInstance, selectName, selectId) {
+    if (!(parserInstance instanceof CEXParser)) {
+        console.error("iliadsmenu: Invalid parserInstance.");
+        return `<select name="${selectName}" id="${selectId}"><option value="">Error: Invalid Parser</option></select>`;
+    }
+    // Ensure dependent HMTLib functions are available
+    if (typeof HMTLib.iliads !== 'function') {
+        console.error("iliadsmenu: HMTLib.iliads is not defined.");
+        return `<select name="${selectName}" id="${selectId}"><option value="">Error: iliads fn missing</option></select>`;
+    }
+    if (typeof HMTLib.textlabel !== 'function') {
+        console.error("iliadsmenu: HMTLib.textlabel is not defined.");
+        return `<select name="${selectName}" id="${selectId}"><option value="">Error: textlabel fn missing</option></select>`;
+    }
+
+    let optionsHtml = '<option value="">-- Select an Iliad Version --</option>\n'; // Add a default instructional option
+    const iliadUrns = HMTLib.iliads(parserInstance);
+
+    if (iliadUrns.length === 0) {
+        optionsHtml += '<option value="">No Iliad versions found</option>';
+    } else {
+        iliadUrns.forEach(urn => {
+            const label = HMTLib.textlabel(urn, parserInstance);
+            const displayLabel = label ? label : urn; // Fallback to URN if label is null
+            
+            // Basic HTML escaping for attribute values and content
+            const escapedUrn = urn.replace(/"/g, "&quot;"); 
+            const escapedDisplayLabel = displayLabel.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    
+            optionsHtml += `<option value="${escapedUrn}">${escapedDisplayLabel}</option>\n`;
+        });
+    }
+    const selectHtml = `<select name="${selectName}" id="${selectId}">\n${optionsHtml}</select>`;
+    return selectHtml;
+}
+
+
+// Expose classes and functions
+window.HMTLib.DSERecord = DSERecord;
+window.HMTLib.Scholion = Scholion;
+window.HMTLib.CodexPage = CodexPage;
+
+window.HMTLib.hmtcurrent = hmtcurrent;
+window.HMTLib.hmtnormalized = hmtnormalized;
+window.HMTLib.hmtdiplomatic = hmtdiplomatic;
+window.HMTLib.hmtdse = hmtdse;
+window.HMTLib.recordsforpage = recordsforpage;
+window.HMTLib.recordforpassage = recordforpassage;
+window.HMTLib.imageforpage = imageforpage;
+window.HMTLib.hmtscholia = hmtscholia;
+window.HMTLib.passageforscholion = passageforscholion;
+window.HMTLib.scholiaforpassage = scholiaforpassage;
+window.HMTLib.codex = codex;
+window.HMTLib.collectionlabel = collectionlabel;
+window.HMTLib.textlabel = textlabel;
+window.HMTLib.codexlist = codexlist;
+window.HMTLib.codexmenu = codexmenu;
+window.HMTLib.text_for_hmturn = text_for_hmturn;
+window.HMTLib.iliads = iliads;
+window.HMTLib.iliadsmenu = iliadsmenu; // New function exposed
 
 })(window);

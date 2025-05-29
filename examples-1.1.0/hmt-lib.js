@@ -44,7 +44,7 @@ return parser.loadFromUrl(hmtCurrentCexUrl);
     }
 
 function hmtnormalized(parserInstance) {
-if (typeof URNTools === 'undefined') { console.error("hmtnormalized: URNTools not defined."); return []; }
+if (typeof URNTools === 'undefined') { console.error("hmtnormalized: URNTools not defined. Functions relying on it may not work as expected."); }
 if (!(parserInstance instanceof CEXParser)) { console.error("hmtnormalized: Invalid parserInstance."); return []; }
 const filteredRecords = [];
 const ctsDataBlockContents = parserInstance.getBlockContents('ctsdata');
@@ -56,19 +56,16 @@ if (trimmedLine === '' || trimmedLine.startsWith('//')) return;
 const parts = trimmedLine.split('|');
 if (parts.length >= 1) {
 const urnString = parts[0];
-// URNTools.workcomponent might not exist or might not be the right tool if URNs are not fully canonical
-// A simple string check for ".normalized" in the URN might be more robust if URNTools is missing/old
 let workComponent = '';
-if (typeof URNTools.workcomponent === 'function') {
+if (typeof URNTools !== 'undefined' && typeof URNTools.workcomponent === 'function') {
     workComponent = URNTools.workcomponent(urnString);
-} else if (urnString.includes('.normalized')) { // Fallback if URNTools.workcomponent is not available
-    workComponent = '.normalized'; // Dummy value to pass the check
+} else if (urnString.includes('.normalized')) {
+    workComponent = '.normalized'; 
 }
 
 if (workComponent && workComponent.endsWith('.normalized')) {
 filteredRecords.push(trimmedLine);
-                    } else if (urnString.includes('.normalized') && typeof URNTools.workcomponent !== 'function') {
-                        // Fallback for cases where URNTools.workcomponent is unavailable but URN contains the target string
+                    } else if (!workComponent && urnString.includes('.normalized')) {
                         filteredRecords.push(trimmedLine);
                     }
                 }
@@ -78,7 +75,7 @@ return filteredRecords;
     }
 
 function hmtdiplomatic(parserInstance) {
-if (typeof URNTools === 'undefined') { console.error("hmtdiplomatic: URNTools not defined."); return []; }
+if (typeof URNTools === 'undefined') { console.error("hmtdiplomatic: URNTools not defined. Functions relying on it may not work as expected."); }
 if (!(parserInstance instanceof CEXParser)) { console.error("hmtdiplomatic: Invalid parserInstance."); return []; }
 const filteredRecords = [];
 const ctsDataBlockContents = parserInstance.getBlockContents('ctsdata');
@@ -91,14 +88,14 @@ const parts = trimmedLine.split('|');
 if (parts.length >= 1) {
 const urnString = parts[0];
 let workComponent = '';
-if (typeof URNTools.workcomponent === 'function') {
+if (typeof URNTools !== 'undefined' && typeof URNTools.workcomponent === 'function') {
     workComponent = URNTools.workcomponent(urnString);
-} else if (urnString.includes('.diplomatic')) { // Fallback
+} else if (urnString.includes('.diplomatic')) {
     workComponent = '.diplomatic';
 }
 if (workComponent && workComponent.endsWith('.diplomatic')) {
 filteredRecords.push(trimmedLine);
-                    } else if (urnString.includes('.diplomatic') && typeof URNTools.workcomponent !== 'function') {
+                    } else if (!workComponent && urnString.includes('.diplomatic')) {
                         filteredRecords.push(trimmedLine);
                     }
                 }
@@ -106,6 +103,7 @@ filteredRecords.push(trimmedLine);
         });
 return filteredRecords;
     }
+
 function hmtdse(parserInstance) {
 const dseRecords = [];
 const targetRelationSetUrn = "urn:cite2:hmt:hmtdse.v1:all";
@@ -199,12 +197,14 @@ function scholiaforpassage(iliadUrn, scholiaArray) {
 if (!iliadUrn || typeof iliadUrn !== 'string' || !Array.isArray(scholiaArray)) { console.error("scholiaforpassage: Invalid input."); return []; }
 return scholiaArray.filter(s => s instanceof HMTLib.Scholion && s.iliad === iliadUrn).map(s => s.scholion);
     }
+
 function codex(parserInstance, codexUrnPrefix) {
 const codexPagesResult = [];
 const requiredColumns = ['urn', 'sequence', 'image', 'rv', 'label'];
 if (!(parserInstance instanceof CEXParser)) { console.error("codex: Invalid parserInstance provided."); return []; }
 if (typeof codexUrnPrefix !== 'string' || !codexUrnPrefix.endsWith(':')) { console.error("codex: codexUrnPrefix must be a string ending with a colon."); return []; }
-if (typeof URNTools === 'undefined') { console.error("codex: URNTools is not defined."); return []; }
+if (typeof URNTools === 'undefined') { console.error("codex: URNTools is not defined. Functions relying on it may not work as expected."); }
+
 const citeDataBlocks = parserInstance.getBlockContents("citedata");
 for (const blockContent of citeDataBlocks) {
 const lines = blockContent.split('\n');
@@ -233,23 +233,33 @@ const columnValues = trimmedLine.split('|');
 let maxRequiredIndex = 0;
 for (const rc of requiredColumns) { if (columnIndexMap[rc] > maxRequiredIndex) maxRequiredIndex = columnIndexMap[rc]; }
 if (columnValues.length <= maxRequiredIndex) continue;
+
 const currentRowFullUrn = columnValues[columnIndexMap['urn']].trim();
+let isValidUrn = false;
+let rowNamespace = null;
+let rowCollection = null;
 
-// Check if URNTools and its functions are available before calling
-let isValid = false;
-if (typeof URNTools.isValidCite2Urn === 'function') {
-    isValid = URNTools.isValidCite2Urn(currentRowFullUrn);
+if (typeof URNTools !== 'undefined' && typeof URNTools.isValidCite2Urn === 'function') {
+    isValidUrn = URNTools.isValidCite2Urn(currentRowFullUrn);
 } else {
-    // Fallback or warning if URNTools.isValidCite2Urn is not available
-    // console.warn("codex: URNTools.isValidCite2Urn is not available. Assuming URN is valid if it starts with 'urn:cite2:'.");
-    isValid = currentRowFullUrn.startsWith("urn:cite2:");
+    isValidUrn = currentRowFullUrn.startsWith("urn:cite2:");
 }
-if (!isValid) continue;
 
-const rowNamespace = (typeof URNTools.cite2namespace === 'function') ? URNTools.cite2namespace(currentRowFullUrn) : currentRowFullUrn.split(':')[2];
-const rowCollection = (typeof URNTools.collectioncomponent === 'function') ? URNTools.collectioncomponent(currentRowFullUrn) : currentRowFullUrn.split(':')[3];
+if (isValidUrn) {
+    if (typeof URNTools !== 'undefined' && typeof URNTools.cite2namespace === 'function' && typeof URNTools.collectioncomponent === 'function') {
+        rowNamespace = URNTools.cite2namespace(currentRowFullUrn);
+        rowCollection = URNTools.collectioncomponent(currentRowFullUrn);
+    } else {
+        const urnParts = currentRowFullUrn.split(':');
+        if (urnParts.length >= 4) {
+            rowNamespace = urnParts[2];
+            rowCollection = urnParts[3];
+        }
+    }
+}
 
-if (!rowNamespace || !rowCollection) continue;
+if (!isValidUrn || !rowNamespace || !rowCollection) continue;
+
 const currentRowPrefix = `urn:cite2:${rowNamespace}:${rowCollection}:`;
 if (currentRowPrefix === codexUrnPrefix) {
 try {
@@ -290,43 +300,90 @@ return rowParts[descriptionIndex].trim();
 return null;
     }
 
-function textlabel(textCtsUrn, parserInstance) {
-if (!textCtsUrn || typeof textCtsUrn !== 'string') { console.error("textlabel: textCtsUrn invalid."); return null; }
-if (!(parserInstance instanceof CEXParser)) { console.error("textlabel: parserInstance invalid."); return null; }
-const dataString = parserInstance.getDelimitedData("ctscatalog");
-if (!dataString) return null;
-const lines = dataString.split('\n');
-if (lines.length < 1) return null;
-const headerParts = lines[0].split('|').map(h => h.trim());
-const colIndices = {
-urn: headerParts.indexOf("urn"), groupName: headerParts.indexOf("groupName"),
-workTitle: headerParts.indexOf("workTitle"), versionLabel: headerParts.indexOf("versionLabel"),
-exemplarLabel: headerParts.indexOf("exemplarLabel")
-        };
-if (colIndices.urn === -1 || colIndices.groupName === -1 || colIndices.workTitle === -1 || colIndices.versionLabel === -1) { console.error("textlabel: Required columns not in 'ctscatalog' header."); return null; }
-for (let i = 1; i < lines.length; i++) {
-const line = lines[i].trim();
-if (line === "") continue;
-const rowParts = line.split('|');
-if (rowParts.length <= colIndices.urn) continue;
-if (rowParts[colIndices.urn].trim() === textCtsUrn) {
-if (rowParts.length <= Math.max(colIndices.groupName, colIndices.workTitle, colIndices.versionLabel)) return null;
-const group = rowParts[colIndices.groupName].trim();
-const work = rowParts[colIndices.workTitle].trim();
-const version = rowParts[colIndices.versionLabel].trim();
-let exemplar = "";
-if (colIndices.exemplarLabel !== -1 && rowParts.length > colIndices.exemplarLabel && rowParts[colIndices.exemplarLabel]) {
-exemplar = rowParts[colIndices.exemplarLabel].trim();
-                }
-let label = `${group}, ${work} (${version})`;
-if (exemplar) {
-label += ` ${exemplar}`; // Added space before exemplar
-                }
-return label;
-            }
-        }
-return null;
+function textlabel(textCtsUrnInput, parserInstance) {
+    if (!textCtsUrnInput || typeof textCtsUrnInput !== 'string') {
+        console.error("textlabel: textCtsUrnInput invalid or not a string.");
+        return null;
     }
+    if (!(parserInstance instanceof CEXParser)) {
+        console.error("textlabel: parserInstance invalid.");
+        return null;
+    }
+
+    let searchUrnToUse;
+    const originalUrnParts = textCtsUrnInput.split(':');
+
+    if (originalUrnParts.length !== 5) {
+        searchUrnToUse = textCtsUrnInput;
+    } else { 
+        const workIdentifier = originalUrnParts[3];
+        const workSubparts = workIdentifier.split('.');
+        
+        let processedWorkIdentifier = workIdentifier;
+        if (workSubparts.length === 4) {
+            processedWorkIdentifier = workSubparts.slice(0, 3).join('.');
+        }
+        searchUrnToUse = `${originalUrnParts[0]}:${originalUrnParts[1]}:${originalUrnParts[2]}:${processedWorkIdentifier}:`;
+    }
+    
+    const dataString = parserInstance.getDelimitedData("ctscatalog");
+    if (!dataString) {
+        return null;
+    }
+
+    const lines = dataString.split('\n');
+    if (lines.length < 1) {
+        return null;
+    }
+
+    const headerParts = lines[0].split('|').map(h => h.trim());
+    const colIndices = {
+        urn: headerParts.indexOf("urn"),
+        groupName: headerParts.indexOf("groupName"),
+        workTitle: headerParts.indexOf("workTitle"),
+        versionLabel: headerParts.indexOf("versionLabel"),
+        exemplarLabel: headerParts.indexOf("exemplarLabel")
+    };
+
+    if (colIndices.urn === -1 || colIndices.groupName === -1 || colIndices.workTitle === -1 || colIndices.versionLabel === -1) {
+        console.error("textlabel: Required columns (urn, groupName, workTitle, versionLabel) not found in 'ctscatalog' header.");
+        return null;
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === "") continue;
+
+        const rowParts = line.split('|');
+        if (rowParts.length <= colIndices.urn) continue;
+
+        if (rowParts[colIndices.urn].trim() === searchUrnToUse) {
+            if (rowParts.length <= Math.max(colIndices.groupName, colIndices.workTitle, colIndices.versionLabel)) {
+                return null;
+            }
+
+            const group = rowParts[colIndices.groupName].trim();
+            const work = rowParts[colIndices.workTitle].trim();
+            const version = rowParts[colIndices.versionLabel].trim();
+            let exemplar = "";
+
+            if (colIndices.exemplarLabel !== -1 && rowParts.length > colIndices.exemplarLabel && rowParts[colIndices.exemplarLabel]) {
+                exemplar = rowParts[colIndices.exemplarLabel].trim();
+            }
+
+            let label = `${group}, ${work}`;
+            if (version) { 
+                label += ` (${version})`;
+            }
+            if (exemplar) { 
+                label += ` ${exemplar}`;
+            }
+            return label;
+        }
+    }
+    return null;
+}
+
 
 function codexlist(parserInstance) {
 if (!(parserInstance instanceof CEXParser)) { console.error("codexlist: Invalid parserInstance."); return []; }
@@ -373,45 +430,34 @@ const selectHtml = `<select name="${selectName}" id="${selectId}">\n${optionsHtm
 return selectHtml;
     }
 
-// --- NEW text_for_hmturn FUNCTION ---
-/**
- * Retrieves text from a corpus based on a passage identifier and exemplar.
- * Modifies the passage identifier to include the exemplar, and for scholia,
- * searches for .lemma and .comment versions.
- *
- * @param {string} passageIdentifier - The base CTS URN for the passage (e.g., "urn:cts:greekLit:tlg0012.tlg001.msA:1.1").
- * @param {string} exemplar - The exemplar to append (e.g., "normalized", "diplomatic").
- * @param {string} corpusString - A string containing the corpus data, with each entry as "URN|text" on a new line.
- * @returns {string} A string containing all matching lines from the corpus (URN|text), joined by newlines. Returns an empty string if no matches or on error.
- */
-function text_for_hmturn(passageIdentifier, exemplar, corpusString) {
+function text_for_hmturn(passageIdentifier, exemplar, corpusInput) {
     if (typeof passageIdentifier !== 'string' || passageIdentifier.trim() === '') {
-        // console.warn("text_for_hmturn: passageIdentifier must be a non-empty string. Received:", passageIdentifier);
-        return ""; // Fail quietly if passageIdentifier is invalid, as it might come from data.
+        return "";
     }
     if (typeof exemplar !== 'string' || exemplar.trim() === '') {
         console.error("text_for_hmturn: exemplar must be a non-empty string. Received:", exemplar);
         return "";
     }
-    if (typeof corpusString !== 'string') {
-        console.error("text_for_hmturn: corpusString must be a string. Received type:", typeof corpusString);
+    
+    let corpusLines = [];
+    if (typeof corpusInput === 'string') {
+        corpusLines = corpusInput.split('\n');
+    } else if (Array.isArray(corpusInput)) {
+        corpusLines = corpusInput; 
+    } else {
+        console.error("text_for_hmturn: corpusInput must be a string or an array of strings. Received type:", typeof corpusInput);
         return "";
     }
 
     const parts = passageIdentifier.split(':');
-    // According to prompt, input passageIdentifier has 5 colon-separated parts.
-    // Example: urn:cts:greekLit:tlg0012.tlg001.msA:1.1
-    // parts[0]=urn, parts[1]=cts, parts[2]=greekLit, parts[3]=tlg0012.tlg001.msA, parts[4]=1.1
     if (parts.length !== 5) {
         console.warn(`text_for_hmturn: passageIdentifier was expected to have 5 colon-separated parts. Received: "${passageIdentifier}" which has ${parts.length} parts. Cannot reliably construct search URN.`);
         return "";
     }
     
-    // The 4th part (index 3) identifies the work. Append ".exemplar" to it.
     const workComponentOriginal = parts[3];
     const modifiedWorkComponent = `${workComponentOriginal}.${exemplar}`;
     
-    // Construct the base URN for searching (before .lemma/.comment for scholia)
     const baseSearchUrn = `${parts[0]}:${parts[1]}:${parts[2]}:${modifiedWorkComponent}:${parts[4]}`;
 
     const SCHOLION_PREFIX = "urn:cts:greekLit:tlg5026";
@@ -425,12 +471,6 @@ function text_for_hmturn(passageIdentifier, exemplar, corpusString) {
         searchUrns.push(baseSearchUrn);
     }
     
-    // For debugging:
-    // console.log(`text_for_hmturn: Input URN: ${passageIdentifier}, Exemplar: ${exemplar}`);
-    // console.log(`text_for_hmturn: Constructed base search URN: ${baseSearchUrn}`);
-    // console.log(`text_for_hmturn: Is Scholion: ${isScholion}, Final search URNs: ${searchUrns.join(', ')}`);
-
-    const corpusLines = corpusString.split('\n');
     const matchedLines = [];
 
     for (const line of corpusLines) {
@@ -438,7 +478,7 @@ function text_for_hmturn(passageIdentifier, exemplar, corpusString) {
         if (trimmedLine === '') continue;
 
         const pipeIndex = trimmedLine.indexOf('|');
-        if (pipeIndex === -1) continue; // Malformed line, no pipe delimiter
+        if (pipeIndex === -1) continue; 
         
         const currentUrnInCorpus = trimmedLine.substring(0, pipeIndex);
         
@@ -446,8 +486,199 @@ function text_for_hmturn(passageIdentifier, exemplar, corpusString) {
             matchedLines.push(trimmedLine);
         }
     }
-
     return matchedLines.join('\n');
+}
+
+function iliads(parserInstance) {
+    if (!(parserInstance instanceof CEXParser)) {
+        console.error("iliads: Invalid parserInstance provided.");
+        return [];
+    }
+
+    const iliadUrns = [];
+    const ILIAD_URN_PREFIX = "urn:cts:greekLit:tlg0012";
+    const catalogDataString = parserInstance.getDelimitedData("ctscatalog");
+
+    if (!catalogDataString) {
+        console.warn("iliads: No 'ctscatalog' data found in parserInstance.");
+        return [];
+    }
+
+    const lines = catalogDataString.split('\n');
+    if (lines.length < 1) { 
+        console.warn("iliads: 'ctscatalog' data is empty or malformed.");
+        return [];
+    }
+
+    const headerLine = lines[0].trim();
+    const headerParts = headerLine.split('|').map(h => h.trim());
+    const urnColumnIndex = headerParts.indexOf("urn");
+
+    if (urnColumnIndex === -1) {
+        console.error("iliads: 'urn' column not found in 'ctscatalog' header.");
+        return [];
+    }
+
+    for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line === "" || line.startsWith("//")) continue; 
+
+        const columns = line.split('|');
+        if (columns.length > urnColumnIndex) {
+            const currentUrn = columns[urnColumnIndex].trim();
+            if (currentUrn.startsWith(ILIAD_URN_PREFIX)) {
+                iliadUrns.push(currentUrn);
+            }
+        }
+    }
+    return iliadUrns;
+}
+
+function iliadsmenu(parserInstance, selectName, selectId) {
+    if (!(parserInstance instanceof CEXParser)) {
+        console.error("iliadsmenu: Invalid parserInstance.");
+        return `<select name="${selectName}" id="${selectId}"><option value="">Error: Invalid Parser</option></select>`;
+    }
+    if (typeof HMTLib.iliads !== 'function') {
+        console.error("iliadsmenu: HMTLib.iliads is not defined.");
+        return `<select name="${selectName}" id="${selectId}"><option value="">Error: iliads fn missing</option></select>`;
+    }
+    if (typeof HMTLib.textlabel !== 'function') {
+        console.error("iliadsmenu: HMTLib.textlabel is not defined.");
+        return `<select name="${selectName}" id="${selectId}"><option value="">Error: textlabel fn missing</option></select>`;
+    }
+
+    let optionsHtml = '<option value="">-- Select an Iliad Version --</option>\n';
+    const iliadUrns = HMTLib.iliads(parserInstance);
+
+    if (iliadUrns.length === 0) {
+        optionsHtml += '<option value="">No Iliad versions found</option>';
+    } else {
+        iliadUrns.forEach(urn => {
+            const label = HMTLib.textlabel(urn, parserInstance);
+            const displayLabel = label ? label : urn;
+            const escapedUrn = urn.replace(/"/g, "&quot;"); 
+            const escapedDisplayLabel = displayLabel.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+            optionsHtml += `<option value="${escapedUrn}">${escapedDisplayLabel}</option>\n`;
+        });
+    }
+    const selectHtml = `<select name="${selectName}" id="${selectId}">\n${optionsHtml}</select>`;
+    return selectHtml;
+}
+
+function iliadbooks(iliadVersionUrn, textCorpusArray) {
+    if (typeof iliadVersionUrn !== 'string' || !iliadVersionUrn.endsWith(':')) {
+        console.error("iliadbooks: iliadVersionUrn must be a string ending with a colon.");
+        return [];
+    }
+    if (!Array.isArray(textCorpusArray)) {
+        console.error("iliadbooks: textCorpusArray must be an array of strings.");
+        return [];
+    }
+
+    let searchPrefix = iliadVersionUrn;
+    const urnParts = iliadVersionUrn.slice(0, -1).split(':'); 
+
+    if (urnParts.length === 4) {
+        const workIdentifier = urnParts[3];
+        const workSubparts = workIdentifier.split('.');
+        if (workSubparts.length === 3) {
+            const newWorkIdentifier = `${workIdentifier}.diplomatic`;
+            searchPrefix = `${urnParts[0]}:${urnParts[1]}:${urnParts[2]}:${newWorkIdentifier}:`;
+        }
+    } else {
+        console.warn(`iliadbooks: Expected iliadVersionUrn to have 4 colon-separated parts before the final colon. Received: ${iliadVersionUrn}`);
+    }
+
+    const bookNumbers = new Set();
+
+    for (const line of textCorpusArray) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === '') continue;
+        const pipeIndex = trimmedLine.indexOf('|');
+        if (pipeIndex === -1) continue; 
+        const currentUrnInCorpus = trimmedLine.substring(0, pipeIndex);
+
+        if (currentUrnInCorpus.startsWith(searchPrefix)) {
+            const passageParts = currentUrnInCorpus.split(':');
+            if (passageParts.length === 5) { 
+                const passageIdentifier = passageParts[4]; 
+                const bookAndLine = passageIdentifier.split('.');
+                if (bookAndLine.length >= 1) { 
+                    bookNumbers.add(bookAndLine[0]);
+                }
+            }
+        }
+    }
+    return Array.from(bookNumbers).sort((a, b) => parseFloat(a) - parseFloat(b));
+}
+
+// --- NEW iliadlines FUNCTION ---
+/**
+ * Finds all URNs for lines within a specific book of an Iliad version from a text corpus.
+ * @param {string} iliadBookUrn - The URN specifying the Iliad version and book 
+ *                                (e.g., "urn:cts:greekLit:tlg0012.tlg001.msA:1" for Book 1 of msA).
+ *                                This URN should NOT have a trailing colon.
+ * @param {string[]} textCorpusArray - An array of strings, where each string is a pipe-delimited "URN|text" line.
+ * @returns {string[]} A list of full URNs for lines found in that book of that Iliad version.
+ */
+function iliadlines(iliadBookUrn, textCorpusArray) {
+    if (typeof iliadBookUrn !== 'string' || iliadBookUrn.endsWith(':')) {
+        // The input iliadBookUrn for this function is expected to be like "urn:cts:greekLit:tlg0012.tlg001.msA:1"
+        // (i.e., version URN + book number, without a trailing colon on the book number part)
+        console.error("iliadlines: iliadBookUrn must be a string and NOT end with a colon. It should specify version and book, e.g., urn:cts:greekLit:tlg0012.tlg001.msA:1");
+        return [];
+    }
+    if (!Array.isArray(textCorpusArray)) {
+        console.error("iliadlines: textCorpusArray must be an array of strings.");
+        return [];
+    }
+
+    let baseUrnForSearch = iliadBookUrn;
+    const urnParts = iliadBookUrn.split(':');
+
+    // The URN structure here is urn:cts:namespace:work.identifier:book
+    // So, urnParts[3] is the work.identifier
+    if (urnParts.length === 5) { // e.g. urn:cts:greekLit:tlg0012.tlg001.msA:1
+        const workIdentifier = urnParts[3];
+        const workSubparts = workIdentifier.split('.');
+        if (workSubparts.length === 3) { // e.g. tlg0012.tlg001.msA
+            const newWorkIdentifier = `${workIdentifier}.diplomatic`;
+            // Reconstruct baseUrnForSearch up to the work identifier part, then append the book (urnParts[4])
+            baseUrnForSearch = `${urnParts[0]}:${urnParts[1]}:${urnParts[2]}:${newWorkIdentifier}:${urnParts[4]}`;
+        }
+        // If workSubparts.length is 4 (e.g., tlg0012.tlg001.msA.normalized), baseUrnForSearch is already correct.
+    } else {
+        console.warn(`iliadlines: Expected iliadBookUrn to have 5 colon-separated parts (urn:cts:ns:work:book). Received: ${iliadBookUrn}`);
+        // Proceed with original, but results might be incorrect.
+    }
+
+    // The search prefix should now be the (potentially modified) base URN plus a dot,
+    // to match lines like "urn:cts:greekLit:tlg0012.tlg001.msA.diplomatic:1.1"
+    // but not "urn:cts:greekLit:tlg0012.tlg001.msA.diplomatic:12.1" if searching for book 1.
+    const searchPrefixForLines = `${baseUrnForSearch}.`; 
+    // console.log("iliadlines searchPrefixForLines:", searchPrefixForLines);
+
+    const lineUrns = [];
+
+    for (const line of textCorpusArray) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === '') continue;
+
+        const pipeIndex = trimmedLine.indexOf('|');
+        if (pipeIndex === -1) continue;
+        
+        const currentUrnInCorpus = trimmedLine.substring(0, pipeIndex);
+
+        // Check if the corpus URN starts with the specific book prefix
+        // This ensures we get "urn:...:1.1", "urn:...:1.2", etc., but not "urn:...:10.1"
+        if (currentUrnInCorpus.startsWith(searchPrefixForLines)) {
+            lineUrns.push(currentUrnInCorpus);
+        }
+    }
+    
+    // No specific sorting requested for line URNs, they will be in corpus order.
+    return lineUrns;
 }
 
 
@@ -471,6 +702,10 @@ window.HMTLib.collectionlabel = collectionlabel;
 window.HMTLib.textlabel = textlabel;
 window.HMTLib.codexlist = codexlist;
 window.HMTLib.codexmenu = codexmenu;
-window.HMTLib.text_for_hmturn = text_for_hmturn; // New function exposed
+window.HMTLib.text_for_hmturn = text_for_hmturn;
+window.HMTLib.iliads = iliads;
+window.HMTLib.iliadsmenu = iliadsmenu; 
+window.HMTLib.iliadbooks = iliadbooks;
+window.HMTLib.iliadlines = iliadlines; // New function exposed
 
 })(window);

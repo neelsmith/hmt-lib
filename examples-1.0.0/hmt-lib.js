@@ -534,21 +534,11 @@ function iliads(parserInstance) {
     return iliadUrns;
 }
 
-// --- NEW iliadsmenu FUNCTION ---
-/**
- * Builds an HTML select menu for choosing an Iliad version.
- * Uses HMTLib.iliads to get URNs and HMTLib.textlabel for option text.
- * @param {CEXParser} parserInstance - The CEXParser instance.
- * @param {string} selectName - The 'name' attribute for the select element.
- * @param {string} selectId - The 'id' attribute for the select element.
- * @returns {string} An HTML string representing the <select> element.
- */
 function iliadsmenu(parserInstance, selectName, selectId) {
     if (!(parserInstance instanceof CEXParser)) {
         console.error("iliadsmenu: Invalid parserInstance.");
         return `<select name="${selectName}" id="${selectId}"><option value="">Error: Invalid Parser</option></select>`;
     }
-    // Ensure dependent HMTLib functions are available
     if (typeof HMTLib.iliads !== 'function') {
         console.error("iliadsmenu: HMTLib.iliads is not defined.");
         return `<select name="${selectName}" id="${selectId}"><option value="">Error: iliads fn missing</option></select>`;
@@ -558,7 +548,7 @@ function iliadsmenu(parserInstance, selectName, selectId) {
         return `<select name="${selectName}" id="${selectId}"><option value="">Error: textlabel fn missing</option></select>`;
     }
 
-    let optionsHtml = '<option value="">-- Select an Iliad Version --</option>\n'; // Add a default instructional option
+    let optionsHtml = '<option value="">-- Select an Iliad Version --</option>\n';
     const iliadUrns = HMTLib.iliads(parserInstance);
 
     if (iliadUrns.length === 0) {
@@ -566,17 +556,129 @@ function iliadsmenu(parserInstance, selectName, selectId) {
     } else {
         iliadUrns.forEach(urn => {
             const label = HMTLib.textlabel(urn, parserInstance);
-            const displayLabel = label ? label : urn; // Fallback to URN if label is null
-            
-            // Basic HTML escaping for attribute values and content
+            const displayLabel = label ? label : urn;
             const escapedUrn = urn.replace(/"/g, "&quot;"); 
             const escapedDisplayLabel = displayLabel.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    
             optionsHtml += `<option value="${escapedUrn}">${escapedDisplayLabel}</option>\n`;
         });
     }
     const selectHtml = `<select name="${selectName}" id="${selectId}">\n${optionsHtml}</select>`;
     return selectHtml;
+}
+
+function iliadbooks(iliadVersionUrn, textCorpusArray) {
+    if (typeof iliadVersionUrn !== 'string' || !iliadVersionUrn.endsWith(':')) {
+        console.error("iliadbooks: iliadVersionUrn must be a string ending with a colon.");
+        return [];
+    }
+    if (!Array.isArray(textCorpusArray)) {
+        console.error("iliadbooks: textCorpusArray must be an array of strings.");
+        return [];
+    }
+
+    let searchPrefix = iliadVersionUrn;
+    const urnParts = iliadVersionUrn.slice(0, -1).split(':'); 
+
+    if (urnParts.length === 4) {
+        const workIdentifier = urnParts[3];
+        const workSubparts = workIdentifier.split('.');
+        if (workSubparts.length === 3) {
+            const newWorkIdentifier = `${workIdentifier}.diplomatic`;
+            searchPrefix = `${urnParts[0]}:${urnParts[1]}:${urnParts[2]}:${newWorkIdentifier}:`;
+        }
+    } else {
+        console.warn(`iliadbooks: Expected iliadVersionUrn to have 4 colon-separated parts before the final colon. Received: ${iliadVersionUrn}`);
+    }
+
+    const bookNumbers = new Set();
+
+    for (const line of textCorpusArray) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === '') continue;
+        const pipeIndex = trimmedLine.indexOf('|');
+        if (pipeIndex === -1) continue; 
+        const currentUrnInCorpus = trimmedLine.substring(0, pipeIndex);
+
+        if (currentUrnInCorpus.startsWith(searchPrefix)) {
+            const passageParts = currentUrnInCorpus.split(':');
+            if (passageParts.length === 5) { 
+                const passageIdentifier = passageParts[4]; 
+                const bookAndLine = passageIdentifier.split('.');
+                if (bookAndLine.length >= 1) { 
+                    bookNumbers.add(bookAndLine[0]);
+                }
+            }
+        }
+    }
+    return Array.from(bookNumbers).sort((a, b) => parseFloat(a) - parseFloat(b));
+}
+
+// --- NEW iliadlines FUNCTION ---
+/**
+ * Finds all URNs for lines within a specific book of an Iliad version from a text corpus.
+ * @param {string} iliadBookUrn - The URN specifying the Iliad version and book 
+ *                                (e.g., "urn:cts:greekLit:tlg0012.tlg001.msA:1" for Book 1 of msA).
+ *                                This URN should NOT have a trailing colon.
+ * @param {string[]} textCorpusArray - An array of strings, where each string is a pipe-delimited "URN|text" line.
+ * @returns {string[]} A list of full URNs for lines found in that book of that Iliad version.
+ */
+function iliadlines(iliadBookUrn, textCorpusArray) {
+    if (typeof iliadBookUrn !== 'string' || iliadBookUrn.endsWith(':')) {
+        // The input iliadBookUrn for this function is expected to be like "urn:cts:greekLit:tlg0012.tlg001.msA:1"
+        // (i.e., version URN + book number, without a trailing colon on the book number part)
+        console.error("iliadlines: iliadBookUrn must be a string and NOT end with a colon. It should specify version and book, e.g., urn:cts:greekLit:tlg0012.tlg001.msA:1");
+        return [];
+    }
+    if (!Array.isArray(textCorpusArray)) {
+        console.error("iliadlines: textCorpusArray must be an array of strings.");
+        return [];
+    }
+
+    let baseUrnForSearch = iliadBookUrn;
+    const urnParts = iliadBookUrn.split(':');
+
+    // The URN structure here is urn:cts:namespace:work.identifier:book
+    // So, urnParts[3] is the work.identifier
+    if (urnParts.length === 5) { // e.g. urn:cts:greekLit:tlg0012.tlg001.msA:1
+        const workIdentifier = urnParts[3];
+        const workSubparts = workIdentifier.split('.');
+        if (workSubparts.length === 3) { // e.g. tlg0012.tlg001.msA
+            const newWorkIdentifier = `${workIdentifier}.diplomatic`;
+            // Reconstruct baseUrnForSearch up to the work identifier part, then append the book (urnParts[4])
+            baseUrnForSearch = `${urnParts[0]}:${urnParts[1]}:${urnParts[2]}:${newWorkIdentifier}:${urnParts[4]}`;
+        }
+        // If workSubparts.length is 4 (e.g., tlg0012.tlg001.msA.normalized), baseUrnForSearch is already correct.
+    } else {
+        console.warn(`iliadlines: Expected iliadBookUrn to have 5 colon-separated parts (urn:cts:ns:work:book). Received: ${iliadBookUrn}`);
+        // Proceed with original, but results might be incorrect.
+    }
+
+    // The search prefix should now be the (potentially modified) base URN plus a dot,
+    // to match lines like "urn:cts:greekLit:tlg0012.tlg001.msA.diplomatic:1.1"
+    // but not "urn:cts:greekLit:tlg0012.tlg001.msA.diplomatic:12.1" if searching for book 1.
+    const searchPrefixForLines = `${baseUrnForSearch}.`; 
+    // console.log("iliadlines searchPrefixForLines:", searchPrefixForLines);
+
+    const lineUrns = [];
+
+    for (const line of textCorpusArray) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === '') continue;
+
+        const pipeIndex = trimmedLine.indexOf('|');
+        if (pipeIndex === -1) continue;
+        
+        const currentUrnInCorpus = trimmedLine.substring(0, pipeIndex);
+
+        // Check if the corpus URN starts with the specific book prefix
+        // This ensures we get "urn:...:1.1", "urn:...:1.2", etc., but not "urn:...:10.1"
+        if (currentUrnInCorpus.startsWith(searchPrefixForLines)) {
+            lineUrns.push(currentUrnInCorpus);
+        }
+    }
+    
+    // No specific sorting requested for line URNs, they will be in corpus order.
+    return lineUrns;
 }
 
 
@@ -602,6 +704,8 @@ window.HMTLib.codexlist = codexlist;
 window.HMTLib.codexmenu = codexmenu;
 window.HMTLib.text_for_hmturn = text_for_hmturn;
 window.HMTLib.iliads = iliads;
-window.HMTLib.iliadsmenu = iliadsmenu; // New function exposed
+window.HMTLib.iliadsmenu = iliadsmenu; 
+window.HMTLib.iliadbooks = iliadbooks;
+window.HMTLib.iliadlines = iliadlines; // New function exposed
 
 })(window);
