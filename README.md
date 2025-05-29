@@ -31,7 +31,7 @@ In `examples-1.0.0`:
 
 In `examples-1.1.0`:
 
-
+- `hmt-text-labels.html`: 
 
 ## Caveats and technical information
 

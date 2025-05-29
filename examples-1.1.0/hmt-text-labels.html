@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>HMTLib textlabel Test</title>
+    <title>How to label texts from URN identifiers</title>
     <style>
         body { font-family: sans-serif; margin: 20px; }
         #output { border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9; }
@@ -17,7 +17,8 @@
     <script src="hmt-lib.js"></script> <!-- Your HMTLib with the modified textlabel -->
 </head>
 <body>
-    <h1>HMTLib <code>textlabel</code> Function Test (with Normalization)</h1>
+    <h1>How to label texts from URN identifiers</h1>
+    <p>This page illustrates how you can get a human-readable label for a text identified by URN.</p>
     <div id="output">
         <p class="info">Loading HMT data... This may take a moment.</p>
         <p class="info">Ensure <code>hmt-lib.js</code> is in the same directory or correctly pathed and contains the updated <code>textlabel</code> function.</p>
@@ -56,7 +57,7 @@
             const initialInfoMessages = outputDiv.querySelectorAll('p.info');
             initialInfoMessages.forEach(msg => msg.remove());
 
-            logHtmlToPage("<h2>Testing <code>textlabel</code> with various URNs:</h2>");
+            logHtmlToPage("<h2>Examples</h2>");
 
             const testUrns = [
                 "urn:cts:greekLit:tlg0012.tlg001.msA:1.1",
