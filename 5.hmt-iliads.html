@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HMTLib iliads Function Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #output { border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9; }
+        .info { color: blue; }
+        .error { color: red; font-weight: bold; }
+        ul { list-style-type: none; padding-left: 0; }
+        li { margin-bottom: 5px; font-family: monospace; }
+    </style>
+    <!-- Using CDN links for dependencies -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <script src="hmt-lib.js"></script> <!-- Your HMTLib with the new iliads function -->
+</head>
+<body>
+    <h1>HMTLib <code>iliads</code> Function Test</h1>
+    <div id="output">
+        <p class="info">Loading HMT data... This may take a moment.</p>
+        <p class="info">Ensure <code>hmt-lib.js</code> is in the same directory or correctly pathed and contains the new <code>iliads</code> function.</p>
+    </div>
+
+    <script>
+        const outputDiv = document.getElementById('output');
+
+        function logHtmlToPage(htmlContent) {
+            const div = document.createElement('div');
+            div.innerHTML = htmlContent;
+            outputDiv.appendChild(div);
+        }
+
+        async function runIliadsTest() {
+            if (typeof CEXParser === 'undefined' || typeof URNTools === 'undefined' || typeof HMTLib === 'undefined' || typeof HMTLib.iliads !== 'function') {
+                logHtmlToPage("<p class='error'>Error: Essential libraries (CEXParser, URNTools, HMTLib, or HMTLib.iliads) are not loaded. Testing cannot proceed. Check script paths and console.</p>");
+                const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+                initialInfoMessages.forEach(msg => msg.style.display = 'none');
+                return;
+            }
+
+            let parserInstance;
+            try {
+                logHtmlToPage("<p>Attempting to load hmt-current.cex...</p>");
+                parserInstance = await HMTLib.hmtcurrent();
+                logHtmlToPage("<p>HMT data loaded successfully. Parser instance created.</p>");
+            } catch (error) {
+                console.error("Error loading HMT data:", error);
+                logHtmlToPage(`<p class="error">Failed to load HMT data: ${error.message}. Testing cannot proceed.</p>`);
+                const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+                initialInfoMessages.forEach(msg => msg.style.display = 'none');
+                return;
+            }
+            
+            const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+            initialInfoMessages.forEach(msg => msg.remove());
+
+            logHtmlToPage("<h2>Running <code>HMTLib.iliads(parserInstance)</code>:</h2>");
+
+            try {
+                const iliadUrns = HMTLib.iliads(parserInstance);
+
+                if (iliadUrns && iliadUrns.length > 0) {
+                    let listHtml = `<p>Found ${iliadUrns.length} Iliad version(s) in the catalog:</p><ul>`;
+                    iliadUrns.forEach(urn => {
+                        listHtml += `<li>${urn}</li>`;
+                    });
+                    listHtml += `</ul>`;
+                    logHtmlToPage(listHtml);
+                } else {
+                    logHtmlToPage("<p>No Iliad URNs found or an error occurred while fetching them.</p>");
+                }
+            } catch (e) {
+                console.error("Error calling HMTLib.iliads or processing results:", e);
+                logHtmlToPage(`<p class="error">An error occurred during the test: ${e.message}</p>`);
+            }
+
+            logHtmlToPage("<p><code>iliads</code> function test completed.</p>");
+        }
+
+        document.addEventListener('DOMContentLoaded', runIliadsTest);
+    </script>
+</body>
+</html>
