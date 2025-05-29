@@ -1,4 +1,4 @@
-# A vibe-coded javascript library for working with published releases of the Homer Multitext project
+# A vibe-coded javascript library for working with published releases of the Homer Multitext project, version 1.1.0
 
 > *`hmtlib.js` is a JavaScript library designed to work with publications from the Homer Multitext project (HMT). It leverages `cex-lib.js` for parsing and manipulating HMT data in CiteEXchange (CEX) format, and `urn-lib.js` for working with CTS and CITE2 URNs. This library provides functions to load HMT data, extract specific datasets like DSE records, scholia, codex information, and retrieve metadata labels.*
 
@@ -16,19 +16,22 @@ The javascript library in [hmt-lib.js](./hmt-lib.js) is designed to facilitate t
 
 ## Contents of this repository
 
-In addition to the library itself (`hmt-lib.js`) and the documentation (`apis.md`), this repository includes the following web illustrations of the library's functionality:
+In addition to the library itself (`hmt-lib.js`) and the documentation (`apis.md`), this repository includes web pages illustrating the library's functionality in the directories `examples-1.0.0` and `examples-1.1.0`. All examples run with the current version of the library; those in `examples-1.0.0` also work with version `1.0.0`.
 
-- `1.hmt-load.html`: illustrates how to load the current release of the Homer Multitext project into a parsed object.
-- `4.hmt-texts.html`: illustrates how to load either a normalized or diplomatic corpus of the texts in the HMT archive. 
-- `5.hmt-dse.html`: illustrates how to load the DSE records from the HMT archive.
-- `6.hmt-dse.html`: illustrates how to load the DSE records from the HMT archive.
-- `7.hmt-scholia.html`: illustrates how to load and query an index linking *Iliad* passages and *scholia*.
-- `8.hmt-codex.html`: illustrates how load a list of `CodexPage` objects for a given manuscript.
-- `9.hmt-catalogs.html`: illustrates how to find human-readable labels for objects cited by CITE2 URN or CTS URN.
-- `14.hmt-codex.html`: illustrates how to use the `codexlist` function to find URNs of all documented codices.
-- `15.hmt-codex-menu.html`: illustrates how to add a menu of HMT manuscripts to a web page using the `codexmenu` function.
+In `examples-1.0.0`:
 
+- `hmt-load.html`: illustrates how to load the current release of the Homer Multitext project into a parsed object.
+- `hmt-texts.html`: illustrates how to load either a normalized or diplomatic corpus of the texts in the HMT archive. 
+- `hmt-dse.html`: illustrates how to load the DSE records from the HMT archive.
+- `hmt-scholia.html`: illustrates how to load and query an index linking *Iliad* passages and *scholia*.
+- `hmt-codex.html`: illustrates how load a list of `CodexPage` objects for a given manuscript.
+- `hmt-catalogs.html`: illustrates how to find human-readable labels for objects cited by CITE2 URN or CTS URN.
+- `hmt-codex.html`: illustrates how to use the `codexlist` function to find URNs of all documented codices.
+- `hmt-codex-menu.html`: illustrates how to add a menu of HMT manuscripts to a web page using the `codexmenu` function.
 
+In `examples-1.1.0`:
+
+- `hmt-text-labels.html`: 
 
 ## Caveats and technical information
 

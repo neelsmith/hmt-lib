@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HMTLib text_for_hmturn Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #output { border: 1px solid #ccc; padding: 10px; white-space: pre-wrap; background-color: #f9f9f9; }
+        .test-case { margin-bottom: 15px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
+        .test-case h3 { margin-top: 0; }
+        .error { color: red; font-weight: bold; }
+        .info { color: blue; }
+    </style>
+    <!-- Using CDN links for dependencies -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>        <!-- CEXParser dependency -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>     <!-- URNTools dependency -->
+    <script src="hmt-lib.js"></script>                                                   <!-- Your modified HMTLib -->
+</head>
+<body>
+    <h1>HMTLib <code>text_for_hmturn</code> Test</h1>
+    <div id="output">
+        <p class="info">Loading HMT data... This may take a moment.</p>
+        <p class="info">Ensure <code>hmt-lib.js</code> is in the same directory or correctly pathed.</p>
+    </div>
+
+    <script>
+        const outputDiv = document.getElementById('output');
+
+        function logToPage(message, type = 'p') {
+            const element = document.createElement(type);
+            element.textContent = message;
+            outputDiv.appendChild(element);
+        }
+        
+        function logHtmlToPage(htmlContent) {
+            const div = document.createElement('div');
+            div.innerHTML = htmlContent;
+            outputDiv.appendChild(div);
+        }
+
+        async function runTests() {
+            if (typeof CEXParser === 'undefined' || typeof URNTools === 'undefined' || typeof HMTLib === 'undefined') {
+                logToPage("Error: Essential libraries (CEXParser, URNTools, or HMTLib) are not loaded. Testing cannot proceed.", "p");
+                outputDiv.querySelector('.info').innerHTML = '<span class="error">Failed to load dependencies. Check script paths and console for errors. The CDN links might be temporarily unavailable or incorrect.</span>';
+                return;
+            }
+
+            try {
+                logToPage("Attempting to load hmt-current.cex...", "p");
+                const parserInstance = await HMTLib.hmtcurrent();
+                logToPage("HMT data loaded successfully. Parser instance created.", "p");
+                outputDiv.querySelector('.info').innerHTML = 'HMT data loaded. Processing...';
+
+
+                logToPage("Extracting DSE records...", "p");
+                const dseRecords = HMTLib.hmtdse(parserInstance);
+                logToPage(`Found ${dseRecords.length} DSE records.`, "p");
+
+                logToPage("Extracting scholia index...", "p");
+                const scholiaIndex = HMTLib.hmtscholia(parserInstance);
+                logToPage(`Found ${scholiaIndex.length} scholia index entries.`, "p");
+
+                logToPage("Extracting normalized text corpus...", "p");
+                const normalizedCorpusArray = HMTLib.hmtnormalized(parserInstance);
+                const normalizedCorpusString = normalizedCorpusArray.join('\n');
+                logToPage(`Normalized corpus created with ${normalizedCorpusArray.length} lines.`, "p");
+                
+                const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+                initialInfoMessages.forEach(msg => msg.remove());
+
+
+                // Test Case 1: 5 random DSE Records
+                logHtmlToPage("<h2>Testing with 5 random DSE Records:</h2>");
+                if (dseRecords.length > 0) {
+                    for (let i = 0; i < 5; i++) {
+                        if (dseRecords.length <= i && i > 0) { 
+                            logHtmlToPage(`<p>Not enough DSE records to pick more unique random ones (total: ${dseRecords.length}).</p>`);
+                            break;
+                        }
+                        const randomIndex = Math.floor(Math.random() * dseRecords.length);
+                        const dseRecord = dseRecords[randomIndex];
+                        
+                        if (!dseRecord || !dseRecord.passage) {
+                            logHtmlToPage(`<div class="test-case error"><h3>Test DSE ${i + 1} (Random Index ${randomIndex})</h3><p>Error: Invalid DSE record or passage property missing.</p></div>`);
+                            continue;
+                        }
+
+                        const passageUrn = dseRecord.passage;
+                        const exemplar = "normalized";
+                        
+                        let testOutput = `<div class="test-case"><h3>Test DSE ${i + 1} (Random Index ${randomIndex})</h3>`;
+                        testOutput += `<p><strong>Input Passage URN:</strong> ${passageUrn}</p>`;
+                        testOutput += `<p><strong>Exemplar:</strong> ${exemplar}</p>`;
+                        
+                        const result = HMTLib.text_for_hmturn(passageUrn, exemplar, normalizedCorpusString);
+                        
+                        testOutput += `<p><strong>Result from text_for_hmturn:</strong></p><pre>${result || "(No text found or error)"}</pre>`;
+                        testOutput += `</div>`;
+                        logHtmlToPage(testOutput);
+                    }
+                } else {
+                    logHtmlToPage("<p class='error'>No DSE records found to test.</p>");
+                }
+
+                // Test Case 2: 3 random Scholion objects
+                logHtmlToPage("<h2>Testing with 3 random Scholion Objects:</h2>");
+                if (scholiaIndex.length > 0) {
+                    for (let i = 0; i < 3; i++) {
+                         if (scholiaIndex.length <= i && i > 0) {
+                            logHtmlToPage(`<p>Not enough Scholion records to pick more unique random ones (total: ${scholiaIndex.length}).</p>`);
+                            break;
+                        }
+                        const randomIndex = Math.floor(Math.random() * scholiaIndex.length);
+                        const scholionObject = scholiaIndex[randomIndex];
+
+                        if (!scholionObject || !scholionObject.scholion || !scholionObject.iliad) {
+                            logHtmlToPage(`<div class="test-case error"><h3>Test Scholion Set ${i + 1} (Random Index ${randomIndex})</h3><p>Error: Invalid Scholion object or properties missing.</p></div>`);
+                            continue;
+                        }
+                        
+                        const exemplar = "normalized";
+                        let testSetOutput = `<div class="test-case"><h3>Test Scholion Set ${i + 1} (Random Index ${randomIndex})</h3>`;
+
+                        // Test with scholionObject.scholion
+                        const scholionUrn = scholionObject.scholion;
+                        testSetOutput += `<h4>Sub-test 1: Using scholion.scholion URN</h4>`;
+                        testSetOutput += `<p><strong>Input Scholion URN:</strong> ${scholionUrn}</p>`;
+                        testSetOutput += `<p><strong>Exemplar:</strong> ${exemplar}</p>`;
+                        const resultScholion = HMTLib.text_for_hmturn(scholionUrn, exemplar, normalizedCorpusString);
+                        testSetOutput += `<p><strong>Result:</strong></p><pre>${resultScholion || "(No text found or error)"}</pre>`;
+
+                        // Test with scholionObject.iliad
+                        const iliadUrn = scholionObject.iliad;
+                        testSetOutput += `<h4>Sub-test 2: Using scholion.iliad URN</h4>`;
+                        testSetOutput += `<p><strong>Input Iliad URN:</strong> ${iliadUrn}</p>`;
+                        testSetOutput += `<p><strong>Exemplar:</strong> ${exemplar}</p>`;
+                        const resultIliad = HMTLib.text_for_hmturn(iliadUrn, exemplar, normalizedCorpusString);
+                        testSetOutput += `<p><strong>Result:</strong></p><pre>${resultIliad || "(No text found or error)"}</pre>`;
+                        
+                        testSetOutput += `</div>`;
+                        logHtmlToPage(testSetOutput);
+                    }
+                } else {
+                    logHtmlToPage("<p class='error'>No Scholion records found to test.</p>");
+                }
+
+                logToPage("All tests completed.", "p");
+
+            } catch (error) {
+                console.error("Error during HMTLib processing:", error);
+                logToPage(`An error occurred: ${error.message}`, "p");
+                const currentInfo = outputDiv.querySelector('p.info');
+                if (currentInfo) {
+                    currentInfo.innerHTML = `<span class="error">Error during processing: ${error.message}</span>`;
+                } else {
+                     logHtmlToPage(`<p><span class="error">Error during processing: ${error.message}</span></p>`);
+                }
+            }
+        }
+
+        // Run the tests when the DOM is ready
+        document.addEventListener('DOMContentLoaded', runTests);
+    </script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HMTLib iliadsmenu Test</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        #output { border: 1px solid #ccc; padding: 10px; background-color: #f9f9f9; }
+        #menuContainer { margin-bottom: 20px; }
+        #selectionDisplay { margin-top: 10px; padding: 10px; border: 1px solid #ddd; background-color: #e9e9e9;}
+        .info { color: blue; }
+        .error { color: red; font-weight: bold; }
+    </style>
+    <!-- Using CDN links for dependencies -->
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/cex-lib/cex.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/neelsmith/urns-lib/urn-lib.js"></script>
+    <script src="hmt-lib.js"></script> <!-- Your HMTLib with the new iliadsmenu function -->
+</head>
+<body>
+    <h1>HMTLib <code>iliadsmenu</code> Function Test</h1>
+    
+    <div id="output">
+        <p class="info">Loading HMT data... This may take a moment.</p>
+        <p class="info">Ensure <code>hmt-lib.js</code> is in the same directory or correctly pathed and contains the new <code>iliadsmenu</code> function.</p>
+    </div>
+
+    <div id="menuContainer">
+        <!-- The iliadsmenu will be inserted here -->
+    </div>
+    <div id="selectionDisplay">
+        <p>No selection yet.</p>
+    </div>
+
+    <script>
+        const outputDiv = document.getElementById('output');
+        const menuContainerDiv = document.getElementById('menuContainer');
+        const selectionDisplayDiv = document.getElementById('selectionDisplay');
+
+        function logHtmlToOutput(htmlContent) {
+            const div = document.createElement('div');
+            div.innerHTML = htmlContent;
+            outputDiv.appendChild(div);
+        }
+
+        function updateSelectionDisplay(selectElement) {
+            const selectedValue = selectElement.value;
+            const selectedOption = selectElement.options[selectElement.selectedIndex];
+            const selectedText = selectedOption ? selectedOption.text : "N/A";
+
+            if (selectedValue) {
+                selectionDisplayDiv.innerHTML = `<p><strong>Currently selected Iliad URN:</strong> <code>${selectedValue}</code></p>
+                                                 <p><strong>Display Label:</strong> ${selectedText}</p>`;
+            } else {
+                selectionDisplayDiv.innerHTML = `<p>No selection yet.</p>`;
+            }
+        }
+
+        async function runIliadsMenuTest() {
+            if (typeof CEXParser === 'undefined' || 
+                typeof URNTools === 'undefined' || 
+                typeof HMTLib === 'undefined' || 
+                typeof HMTLib.iliadsmenu !== 'function' ||
+                typeof HMTLib.iliads !== 'function' ||
+                typeof HMTLib.textlabel !== 'function') {
+                logHtmlToOutput("<p class='error'>Error: Essential libraries or HMTLib functions (CEXParser, URNTools, HMTLib, HMTLib.iliadsmenu, HMTLib.iliads, HMTLib.textlabel) are not loaded. Testing cannot proceed. Check script paths and console.</p>");
+                const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+                initialInfoMessages.forEach(msg => msg.style.display = 'none');
+                return;
+            }
+
+            let parserInstance;
+            try {
+                logHtmlToOutput("<p>Attempting to load hmt-current.cex...</p>");
+                parserInstance = await HMTLib.hmtcurrent();
+                logHtmlToOutput("<p>HMT data loaded successfully. Parser instance created.</p>");
+            } catch (error) {
+                console.error("Error loading HMT data:", error);
+                logHtmlToOutput(`<p class="error">Failed to load HMT data: ${error.message}. Testing cannot proceed.</p>`);
+                const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+                initialInfoMessages.forEach(msg => msg.style.display = 'none');
+                return;
+            }
+            
+            const initialInfoMessages = outputDiv.querySelectorAll('p.info');
+            initialInfoMessages.forEach(msg => msg.remove());
+
+            logHtmlToOutput("<h2>Generating Iliads Menu:</h2>");
+
+            try {
+                const menuName = "iliadSelector";
+                const menuId = "iliad_select_id";
+                const menuHtml = HMTLib.iliadsmenu(parserInstance, menuName, menuId);
+                
+                menuContainerDiv.innerHTML = menuHtml;
+                logHtmlToOutput("<p>Iliads menu generated and added to the page.</p>");
+
+                const selectElement = document.getElementById(menuId);
+                if (selectElement) {
+                    // Add event listener to update display on change
+                    selectElement.addEventListener('change', function() {
+                        updateSelectionDisplay(this);
+                    });
+                    // Initial display update
+                    updateSelectionDisplay(selectElement);
+                } else {
+                    logHtmlToOutput("<p class='error'>Could not find the generated select menu by ID.</p>");
+                }
+
+            } catch (e) {
+                console.error("Error calling HMTLib.iliadsmenu or processing results:", e);
+                logHtmlToOutput(`<p class="error">An error occurred during the menu generation: ${e.message}</p>`);
+            }
+
+            logHtmlToOutput("<p><code>iliadsmenu</code> function test setup completed. Try selecting an option from the menu.</p>");
+        }
+
+        document.addEventListener('DOMContentLoaded', runIliadsMenuTest);
+    </script>
+</body>
+</html>
