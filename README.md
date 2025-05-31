@@ -31,7 +31,12 @@ In `examples-1.0.0`:
 
 In `examples-1.1.0`:
 
-- `hmt-text-labels.html`: 
+- `hmt-text-labels.html`: illustrates how to get a human-readable label for a text identified by URN.
+- `hmt-textretrieval.html`: illustrates how to retrieve text content from references in various HMT indexes.
+- `hmt-iliads.html`: illustrates how to find identifiers for all *Iliad*s cataloged in the release.
+- `hmt-iliadbooks.html`: illustrates how to find books with edited content for a given version of the *Iliad*
+- `hmt-iliadlines.html`: illustrates how to find *Iliad* lines a book or version of the *Iliad*
+- `hmt-iliadmenu.html`: illustrates how to choose an *Iliad* version from a menu on a web page
 
 ## Caveats and technical information
 
